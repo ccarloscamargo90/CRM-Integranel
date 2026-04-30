@@ -1,0 +1,86 @@
+[project]
+name = "crm-granos-mx"
+version = "0.1.0"
+description = "Sistema de Inteligencia Comercial dual: tortillerías + alimento balanceado en México"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Intergranel", email = "operacion@intergranel.mx" }]
+keywords = ["crm", "denue", "inegi", "mexico", "tortillerias", "alimento-balanceado", "lfpdppp"]
+
+# Dependencias base — alineadas con requirements.txt para deploy a Render.
+# Si añades una dep aquí, también ponla en requirements.txt (con el mismo pin).
+dependencies = [
+    "python-dotenv==1.0.1",
+    "pydantic==2.10.6",
+    "pydantic-settings==2.7.1",
+    "loguru==0.7.3",
+    "sqlalchemy==2.0.36",
+    "psycopg[binary]==3.2.4",
+    "alembic==1.14.0",
+    "geoalchemy2==0.16.0",
+    "httpx==0.28.1",
+    "tenacity==9.0.0",
+    "pandas==2.2.3",
+    "numpy==2.2.1",
+    "rapidfuzz==3.10.1",
+    "shapely==2.0.6",
+    "geopandas==1.0.1",
+    "geopy==2.4.1",
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "python-multipart==0.0.20",
+    "apscheduler==3.11.0",
+    "jinja2==3.1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.4.2",
+    "pytest-asyncio==0.25.0",
+    "pytest-cov==6.0.0",
+    "ruff==0.8.6",
+    "mypy==1.14.0",
+    "ipykernel==6.29.5",
+]
+
+notebooks = [
+    "jupyter==1.1.1",
+    "jupyterlab==4.3.4",
+    "matplotlib==3.10.0",
+    "plotly==5.24.1",
+    "folium==0.19.4",
+    "contextily==1.6.2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# ---------- Linter ----------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["migrations/versions", "notebooks", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "UP"]
+ignore = ["E501"]   # length lo controla `line-length`
+
+# ---------- Tests ----------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+
+# ---------- Type checker ----------
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+disallow_untyped_defs = false

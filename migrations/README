@@ -1,0 +1,11 @@
+Alembic migrations — CRM-Granos-MX
+
+Ver `MIGRATIONS.md` en raíz del proyecto (se redacta cuando exista la primera migración real)
+o las reglas en `CLAUDE.md` §migraciones.
+
+Comandos básicos:
+  alembic current                        # qué migración está aplicada
+  alembic history                        # lista cronológica
+  alembic revision -m "descripcion"      # crear nueva migración
+  alembic upgrade head                   # aplicar todas las pendientes
+  alembic downgrade -1                   # revertir la última

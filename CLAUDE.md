@@ -8,9 +8,22 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0 (arqueología + scaffold) y 1 (reporte de reconciliación), ambas 2026-04-30.
-**Próxima:** Fase 1.bis — cimientos transversales (config, db, models, logging, compliance helper, CI). **Esperando 7 decisiones del operador** sobre el plan ajustado (ver `docs/plan_ajustado.md` §3).
-**Última actualización:** 2026-04-30 al cerrar Fase 1.
+**Fases cerradas:** 0 (arqueología + scaffold), 1 (reconciliación), 1.bis (cimientos), todas 2026-04-30.
+**Próxima:** Fase 2 — diseño de chequeos de calidad. Bloqueada solo por la tramitación de Google Places API key (D5).
+**Última actualización:** 2026-04-30 al cerrar Fase 1.bis.
+
+### Capa transversal lista (Fase 1.bis)
+
+- `src/core/config.py` — `Settings` Pydantic, `get_settings()` cacheada.
+- `src/core/db.py` — `engine`, `SessionLocal`, `get_db` dependencia FastAPI, `Base` declarativa.
+- `src/core/logging.py` — `setup_logging()` con loguru (consola + archivo + JSON prod).
+- `src/core/models.py` — 14 modelos ORM SQLAlchemy 2.0 estilo `Mapped[...]`.
+- `src/core/repos/` — `EstablecimientoRepo`, `VendedorRepo` (más se agregan al ritmo de cada fase).
+- `src/compliance/lfpdppp.py` — `registrar_operacion()` para bitácora.
+- `tests/conftest.py` — fixture `db` con transaction-per-test (rollback automático).
+- `tests/test_smoke.py` + `tests/test_db.py` — **11 tests pasan**, ruff limpio.
+- `.github/workflows/ci.yml` — Postgres+PostGIS service, ruff + pytest + alembic en cada PR.
+- venv `.venv/` con `pip install -e ".[dev,notebooks]"` completo.
 
 ### Lo que está hecho
 - Carpeta `CRM-Granos-MX/` creada al lado de los demás proyectos del monorepo, con scaffold completo y `git init`.

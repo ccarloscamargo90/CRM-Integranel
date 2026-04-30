@@ -8,9 +8,18 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0 (arqueología + scaffold), 1 (reconciliación), 1.bis (cimientos), todas 2026-04-30.
-**Próxima:** Fase 2 — diseño de chequeos de calidad. Bloqueada solo por la tramitación de Google Places API key (D5).
-**Última actualización:** 2026-04-30 al cerrar Fase 1.bis.
+**Fases cerradas:** 0 (arqueología + scaffold), 1 (reconciliación), 1.bis (cimientos + Google Cloud setup), todas 2026-04-30.
+**Próxima:** Fase 2 — diseño de chequeos de calidad. **Sin bloqueos.**
+**Última actualización:** 2026-04-30 al cerrar Fase 1.bis (incluye setup completo de Google Cloud).
+
+### Google Cloud setup (2026-04-30)
+
+- **Proyecto:** "My First Project" (`project-44fbe072-34f4-41e9-880`).
+- **Trial:** $5,411 MXN (~$300 USD) por 90 días, vence 2026-07-30.
+- **Places API (New):** habilitada.
+- **API key:** "Maps Platform API Key" creada y restringida a **Places API (New)** únicamente. Sin restricción de IP por ahora (en Fase 4 agregamos IP de Render). Key persiste en `.env` (gitignored).
+- **Budget alert:** "CRM-Granos-MX mensual" — $100 USD/mes, alertas al 50% / 90% / 100%, email a admin.
+- **Tests funcionales:** 2 requests reales OK — Tortillerías CDMX (3 resultados), Forrajeras Toluca (2 resultados). Costo total ~$0.01 USD del free tier 10K Essentials.
 
 ### Capa transversal lista (Fase 1.bis)
 

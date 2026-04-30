@@ -8,22 +8,30 @@
 
 ## 1. Estado del proyecto
 
-**Fase actual:** 0 — Arqueología comparativa + scaffold (en curso, 2026-04-30).
-**Última actualización:** 2026-04-30 al cerrar 0.B.
+**Fase actual:** 0 — Arqueología comparativa + scaffold ✅ **CERRADA 2026-04-30**.
+**Próxima:** Fase 1 — Reporte de reconciliación. **Esperando "adelante" del operador.**
+**Última actualización:** 2026-04-30 al cerrar Fase 0.
 
 ### Lo que está hecho
-- Carpeta `CRM-Granos-MX/` creada al lado de los demás proyectos del monorepo, con scaffold completo y commit inicial.
+- Carpeta `CRM-Granos-MX/` creada al lado de los demás proyectos del monorepo, con scaffold completo y `git init`.
 - Token INEGI DENUE validado contra el endpoint real (`/v1/consulta/Cuantificar/...` — el del prompt maestro estaba obsoleto).
 - Dimensionamiento inicial: **124,432 establecimientos** en las 13 entidades priorizadas, repartidos en **4 canales de venta** (ver §5).
-- Stack decidido y archivos de bootstrap listos (`requirements.txt`, `pyproject.toml`, `alembic.ini`, `.env.example`).
+- Stack instalado y validado de punta a punta:
+  - Postgres.app 18.3 + PostGIS 3.6.2 + pg_trgm 1.6 corriendo en localhost.
+  - DB `crm_granos_mx` creada con extensiones habilitadas.
+  - venv en `.venv/` con 4 deps mínimas (sqlalchemy, psycopg, alembic, python-dotenv).
+  - Conexión Python ↔ Postgres verificada.
+- Schema aplicado: **14 tablas + 4 vistas** del proyecto + 2 sistema PostGIS, con **6 índices GIST/GIN** (geom, fuzzy nombre, JSONB municipios, arrays canales/fuentes).
+- Catálogo PII (`_columnas_pii`) sembrado con **21 columnas conocidas**, cada una con base legal y finalidad LFPDPPP.
+- Migración Alembic `a1b2c3d4e5f6` (baseline) aplicada y registrada en `alembic_version`.
+- `CLAUDE.md` raíz proyecto + `CLAUDE.md` raíz workspace + `notebooks/00_arqueologia.ipynb` listos.
 
 ### Lo que NO está hecho
-- Postgres.app local — pendiente de instalar (Fase 0.E).
-- Schema aplicado a la DB — listo en `db/schema.sql` y migración Alembic, pero no se corrió todavía contra Postgres.
 - Cliente DENUE para descarga real — Fase 3.
 - Cliente Google Places — Fase 4. API key no tramitada todavía.
 - Aviso de privacidad LFPDPPP — Fase 7.
 - Frontend — Fase 8.
+- Comercial-app v2 paralelo — proyecto separado futuro (no parte de este).
 
 ---
 

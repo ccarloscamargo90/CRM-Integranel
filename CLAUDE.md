@@ -8,9 +8,9 @@
 
 ## 1. Estado del proyecto
 
-**Fase actual:** 0 — Arqueología comparativa + scaffold ✅ **CERRADA 2026-04-30**.
-**Próxima:** Fase 1 — Reporte de reconciliación. **Esperando "adelante" del operador.**
-**Última actualización:** 2026-04-30 al cerrar Fase 0.
+**Fases cerradas:** 0 (arqueología + scaffold) y 1 (reporte de reconciliación), ambas 2026-04-30.
+**Próxima:** Fase 1.bis — cimientos transversales (config, db, models, logging, compliance helper, CI). **Esperando 7 decisiones del operador** sobre el plan ajustado (ver `docs/plan_ajustado.md` §3).
+**Última actualización:** 2026-04-30 al cerrar Fase 1.
 
 ### Lo que está hecho
 - Carpeta `CRM-Granos-MX/` creada al lado de los demás proyectos del monorepo, con scaffold completo y `git init`.

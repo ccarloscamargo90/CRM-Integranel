@@ -8,9 +8,50 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, **3 (ingesta DENUE)**, todas 2026-04-30.
-**Próxima:** Fase 4 — enriquecimiento Google Places (~$25 USD presupuesto D3.B).
-**Última actualización:** 2026-04-30 al cerrar Fase 3.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3 (ingesta DENUE), **4 (enriquecimiento Google Places)**, todas 2026-04-30.
+**Próxima:** Fase 5 — cruce con datos públicos (SAT 69-B, INEGI Indicadores, Marco Geoestadístico).
+**Última actualización:** 2026-04-30 al cerrar Fase 4.
+
+### Capa de enriquecimiento Google Places (Fase 4)
+
+- `src/ingestion/places_api.py` — Cliente Places API (New). Text Search + Place Details
+  con FieldMask. Throttling 100 ms (10 req/s). Circuit breaker que aborta si gasto
+  mensual + esta call excede `MONTHLY_BUDGET_USD` ($100). Loguea cada call en
+  `google_places_log` con SKU (Essentials $0.005 / Pro $0.018), bytes y costo.
+- `src/enrichment/matching.py` — Matcher DENUE↔Google. Score 0-100 con peso
+  80% fuzzy nombre (rapidfuzz token_sort) + 20% proximidad (≤200m=alto, >500m=bajo).
+  Match si score ≥70 y distancia ≤200m. Persiste en `enriquecimiento_google` con
+  rating, horarios, teléfono, sitio web, business_status. Si DENUE no tenía
+  teléfono y Google sí, se llena (sin pisar valores manuales).
+- `src/enrichment/cadenas.py` — Detector de cadenas por palabras-marca tras
+  remover genéricas (tortilleria, molino, elaboracion, venta, sin, nombre, etc.).
+  Filtra nombres descriptivos tipo "ELABORACION DE TORTILLAS SIN NOMBRE".
+  Umbral por default: ≥3 sucursales con misma marca.
+- `src/enrichment/places_pipeline.py` — Orquestador D3.B. Selecciona AlimentoBalanceado
+  + Asociaciones + top N cadenas + top tortillerías por volumen. Cache automático
+  (skip si ya hay match), circuit breaker, compliance_log. Commit cada 50.
+- CLI: `--detectar-cadenas`, `--enriquecer [--max-total N]`, `--gasto`.
+
+**Validaciones:**
+- 15 tests nuevos (matching + cadenas) → **125 tests pasan**, ruff limpio.
+- Detección real: **3,247 cadenas** detectadas en 124K establecimientos
+  (top: La Lupita 900 sucursales 13 estados, Juquilita 367, La Guadalupana 339).
+- Smoke real con 10 candidatos: 2 matches, 8 no_match, **$0.086 USD**, 3.4 s.
+  Tasa de match baja porque AlimentoBalanceado son plantas B2B sin perfil
+  consumer en Google Places (esperado).
+
+**Costos reales del universo D3.B completo (default `max_cadenas=20`):**
+- 6,624 candidatos identificados
+- $33 USD mínimo (todos no_match) — $152 USD máximo (todos match con Pro)
+- ~$92 USD si tasa match 50%
+- **El estimado original de $25 USD asumía 5K candidatos; refinar D3.B**
+  bajando `max_cadenas` o usando subset por canal mantiene el budget.
+
+**Recomendaciones de uso por presupuesto:**
+- **$3 USD:** solo AlimentoBalanceado (317) — `python -m src.ingestion.cli --enriquecer --max-total 317`
+- **$25 USD:** AlimentoBalanceado + Asociaciones (2,360)
+- **$50 USD:** D3.B sin cadenas (~3,000 candidatos)
+- **$100 USD (todo el budget):** D3.B completo respetando circuit breaker
 
 ### Capa de ingesta DENUE lista (Fase 3)
 

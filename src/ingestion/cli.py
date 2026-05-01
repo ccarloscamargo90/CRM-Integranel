@@ -1,17 +1,21 @@
-"""CLI de descarga DENUE.
+"""CLI de ingestión y enriquecimiento.
 
 Uso:
-    # Smoke test — 1 entidad chica + 1 SCIAN, máx 50 registros
-    python -m src.ingestion.cli --smoke
+    # Descarga DENUE
+    python -m src.ingestion.cli --smoke                      # Campeche, 100 filas
+    python -m src.ingestion.cli --entidad 23                 # 1 entidad
+    python -m src.ingestion.cli --full                       # 13 entidades, ~4 min
+    python -m src.ingestion.cli --cuantificar 311830         # gratis
 
-    # Descarga real — 1 entidad + 1 SCIAN
-    python -m src.ingestion.cli --entidad 23 --scian 311830
+    # Detección de cadenas
+    python -m src.ingestion.cli --detectar-cadenas
 
-    # Descarga completa (las 13 priorizadas × 8 SCIAN — toma ~5 horas)
-    python -m src.ingestion.cli --full
+    # Enriquecimiento Google Places (D3.B, ~$25 USD)
+    python -m src.ingestion.cli --enriquecer                 # selección D3.B completa
+    python -m src.ingestion.cli --enriquecer --max-total 10  # smoke ~$0.18
 
-    # Cuantificar (gratis, no descarga; útil para dimensionar)
-    python -m src.ingestion.cli --cuantificar 311830
+    # Reporte de gasto Google Places del mes
+    python -m src.ingestion.cli --gasto
 """
 
 from __future__ import annotations
@@ -88,32 +92,97 @@ def _cmd_descarga(
     return 0
 
 
+def _cmd_detectar_cadenas() -> int:
+    setup_logging()
+    from src.enrichment.cadenas import detectar_cadenas, listar_top_cadenas
+
+    with SessionLocal() as session:
+        metricas = detectar_cadenas(session)
+        session.commit()
+
+        print("\n=== Resumen de cadenas detectadas ===")
+        print(f"Total cadenas creadas:        {metricas['cadenas_creadas_total']:,}")
+        print(f"Sucursales vinculadas:        {metricas['sucursales_vinculadas_total']:,}")
+        print("\nPor SCIAN:")
+        for scian, m in metricas["por_scian"].items():
+            print(f"  {scian}  cadenas={m['cadenas_creadas']:>4}  sucursales={m['sucursales_vinculadas']:>5}")
+
+        print("\n=== Top 15 cadenas ===")
+        for c in listar_top_cadenas(session, top=15):
+            print(f"  {c['n_sucursales']:>4} suc  {c['n_estados']} estados  | {c['canal'][:25]:25} | {c['nombre_grupo'][:40]}")
+    return 0
+
+
+def _cmd_enriquecer(*, max_total: int | None) -> int:
+    setup_logging()
+    from src.enrichment.places_pipeline import run_enriquecimiento
+
+    with SessionLocal() as session:
+        resumen = run_enriquecimiento(session, max_total=max_total)
+
+    print("\n=== Resumen enriquecimiento Google Places ===")
+    print(f"Establecimientos evaluados : {len(resumen.establecimientos_evaluados):,}")
+    print(f"Matches                    : {resumen.matches:,}")
+    print(f"No matches                 : {resumen.no_matches:,}")
+    print(f"Skips por cache            : {resumen.skips_cache:,}")
+    print(f"Errores                    : {resumen.errores:,}")
+    print(f"Gasto USD esta corrida     : ${resumen.gasto_total_usd:.4f}")
+    print(f"Duración                   : {resumen.duracion_seg:.1f}s")
+    if resumen.primer_error:
+        print(f"Primer error               : {resumen.primer_error}")
+    return 0 if resumen.errores == 0 else 2
+
+
+def _cmd_gasto() -> int:
+    setup_logging()
+    from src.ingestion.places_api import _gasto_mes_actual_usd
+
+    with SessionLocal() as session:
+        gasto = _gasto_mes_actual_usd(session)
+        from src.core.config import get_settings
+
+        budget = get_settings().MONTHLY_BUDGET_USD
+        print(f"Gasto Google Places este mes: ${gasto:.4f} USD")
+        print(f"Presupuesto MONTHLY_BUDGET_USD: ${budget:.2f} USD")
+        print(f"Disponible: ${budget - gasto:.4f} USD ({100*(1-gasto/budget):.1f}%)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="CLI ingestión DENUE")
+    parser = argparse.ArgumentParser(description="CLI ingestión + enriquecimiento")
+    # Ingesta DENUE
     parser.add_argument("--cuantificar", help="SCIAN para Cuantificar (no descarga)")
     parser.add_argument("--smoke", action="store_true", help="Descarga muy chica (50 registros)")
-    parser.add_argument("--full", action="store_true", help="Descarga completa 13 entidades × 8 SCIAN")
+    parser.add_argument("--full", action="store_true", help="Descarga completa 13 entidades")
     parser.add_argument("--entidad", action="append", help="Cve INEGI (repetible)")
     parser.add_argument("--scian", action="append", help="SCIAN (repetible)")
+
+    # Enriquecimiento
+    parser.add_argument("--enriquecer", action="store_true", help="Enriquecimiento D3.B con Google Places")
+    parser.add_argument("--detectar-cadenas", action="store_true", help="Detectar cadenas por nombre normalizado")
+    parser.add_argument("--gasto", action="store_true", help="Reporta gasto del mes en Google Places")
+
     parser.add_argument(
         "--max-total",
         type=int,
         default=None,
-        help="Tope de registros por batch (safety net)",
+        help="Tope de registros (descarga o enriquecimiento)",
     )
     args = parser.parse_args(argv)
 
     if args.cuantificar:
         return _cmd_cuantificar(args.cuantificar)
-
+    if args.gasto:
+        return _cmd_gasto()
+    if args.detectar_cadenas:
+        return _cmd_detectar_cadenas()
+    if args.enriquecer:
+        return _cmd_enriquecer(max_total=args.max_total)
     if args.full:
         return _cmd_descarga(entidades=None, scians=None, max_total=args.max_total)
-
     if args.smoke:
         return _cmd_descarga(entidades=None, scians=None, max_total=None, smoke=True)
-
     if args.entidad or args.scian:
-        # Validación
         ent = args.entidad or sorted(CVE_ENTIDADES_PRIORIZADAS)
         sci = args.scian or sorted(SCIAN_PRIMARIOS)
         invalidas = set(ent) - CVE_ENTIDADES_PRIORIZADAS

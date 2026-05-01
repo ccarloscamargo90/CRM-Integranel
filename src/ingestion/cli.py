@@ -138,6 +138,41 @@ def _cmd_enriquecer(*, max_total: int | None) -> int:
     return 0 if resumen.errores == 0 else 2
 
 
+def _cmd_descargar_69b() -> int:
+    setup_logging()
+    from src.ingestion.sat_publica import descargar_y_persistir
+
+    with SessionLocal() as session:
+        m = descargar_y_persistir(session)
+
+    print("\n=== SAT Listado 69-B descargado ===")
+    print(f"Filas recibidas:         {m['filas_recibidas']:,}")
+    print(f"Registros persistidos:   {m['registros_persistidos']:,}")
+    print(f"Duración:                {m['duracion_seg']}s")
+    print("Por estatus:")
+    for est, n in sorted(m["por_estatus"].items(), key=lambda x: -x[1]):
+        print(f"  {est:<25} {n:>5,}")
+    return 0
+
+
+def _cmd_cruzar_69b() -> int:
+    setup_logging()
+    from src.enrichment.cruzar_69b import cruzar_riesgo_69b
+
+    with SessionLocal() as session:
+        m = cruzar_riesgo_69b(session)
+
+    print("\n=== Cruce 69-B ===")
+    print(f"Establecimientos con RFC:    {m['total_con_rfc']:,}")
+    print(f"Establecimientos con razón:  {m['total_con_razon']:,}")
+    print(f"Lista 69-B en DB:            {m['total_lista_69b']:,}")
+    print(f"  → marcados por RFC exacto: {m['marcados_por_rfc']:,}")
+    print(f"  → marcados por razón:      {m['marcados_por_razon']:,}")
+    print(f"  → TOTAL marcados riesgo:   {m['marcados_riesgo']:,}")
+    print(f"  → limpiados (ya no riesgo):{m['limpiados']:,}")
+    return 0
+
+
 def _cmd_gasto() -> int:
     setup_logging()
     from src.ingestion.places_api import _gasto_mes_actual_usd
@@ -166,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--enriquecer", action="store_true", help="Enriquecimiento D3.B con Google Places")
     parser.add_argument("--detectar-cadenas", action="store_true", help="Detectar cadenas por razón social")
     parser.add_argument("--incluir-marca", action="store_true", help="También usar heurística de marca residual (ruidosa)")
+    parser.add_argument("--descargar-69b", action="store_true", help="Descarga Lista 69-B SAT y persiste en DB")
+    parser.add_argument("--cruzar-69b", action="store_true", help="Cruce establecimientos.rfc vs lista 69-B SAT")
     parser.add_argument("--gasto", action="store_true", help="Reporta gasto del mes en Google Places")
 
     parser.add_argument(
@@ -180,6 +217,10 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_cuantificar(args.cuantificar)
     if args.gasto:
         return _cmd_gasto()
+    if args.descargar_69b:
+        return _cmd_descargar_69b()
+    if args.cruzar_69b:
+        return _cmd_cruzar_69b()
     if args.detectar_cadenas:
         return _cmd_detectar_cadenas(incluir_marca=args.incluir_marca)
     if args.enriquecer:

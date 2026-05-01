@@ -8,9 +8,39 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3 (ingesta DENUE), **4 (enriquecimiento Google Places)**, todas 2026-04-30.
-**Próxima:** Fase 5 — cruce con datos públicos (SAT 69-B, INEGI Indicadores, Marco Geoestadístico).
-**Última actualización:** 2026-04-30 al cerrar Fase 4.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, **5.1 (SAT 69-B)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** Fase 5.2 — INEGI Indicadores (ENIGH consumo tortilla, SIAP producción maíz, NSE por AGEB).
+**Última actualización:** 2026-05-01 al cerrar Fase 5.1.
+
+### Fase 5.1 — SAT Lista 69-B (cierre)
+
+- `src/ingestion/sat_publica.py` — descarga el CSV oficial mensual desde
+  `omawww.sat.gob.mx/cifras_sat/Documents/Listado_Completo_69-B.csv`,
+  parsea (latin-1, salta 2 líneas de aviso legal), upsert en `sat_lista_69b`
+  con conflict por (rfc, fecha_publicacion_dof). Distingue 4 estatus:
+  Definitivo / Presunto (RIESGO) y Desvirtuado / Sentencia Favorable (LIMPIO).
+- `src/enrichment/cruzar_69b.py` — cruce dual: 1) RFC exacto (alta confianza),
+  2) razón social uppercased (fallback cuando DENUE no trae RFC). Marca
+  `establecimientos.riesgo_69b = true` y registra fecha de publicación DOF
+  más reciente. Limpia automáticamente cuando un RFC pasa a Desvirtuado.
+- CLI: `--descargar-69b` y `--cruzar-69b`. Ejecución mensual recomendada.
+- Compliance log automático en cada descarga y cruce.
+- 5 tests nuevos. Total **131/131 pasan**.
+
+**Resultado real (2026-05-01):**
+- 14,189 registros descargados del SAT.
+  - 11,270 Definitivos + 986 Presuntos = 12,256 en RIESGO
+  - 1,638 Sentencia Favorable + 340 Desvirtuados = 1,978 LIMPIOS
+- **0 establecimientos del CRM marcados** (cruce por razón social exacta + fuzzy).
+- Razón: la 69-B son mayoritariamente empresas fachada de servicios
+  (logística, consultoría, sistemas), mientras tu universo son negocios
+  con operación física (tortillerías, forrajeras, asociaciones, plantas).
+- Validación con rapidfuzz token_sort_ratio: 0 matches ≥95, 1 match 85-94
+  (irrelevante).
+
+**Recomendación operativa:** correr `--descargar-69b && --cruzar-69b` cada
+inicio de mes. El sistema marcará automáticamente cualquier prospecto que
+entre a riesgo o salga de él.
 
 ### Capa de enriquecimiento Google Places (Fase 4)
 

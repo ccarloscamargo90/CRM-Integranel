@@ -8,9 +8,23 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0 (arqueología + scaffold), 1 (reconciliación), 1.bis (cimientos + Google Cloud setup), todas 2026-04-30.
-**Próxima:** Fase 2 — diseño de chequeos de calidad. **Sin bloqueos.**
-**Última actualización:** 2026-04-30 al cerrar Fase 1.bis (incluye setup completo de Google Cloud).
+**Fases cerradas:** 0 (arqueología + scaffold), 1 (reconciliación), 1.bis (cimientos + Google Cloud), 2 (chequeos de calidad), todas 2026-04-30.
+**Próxima:** Fase 3 — descarga real DENUE (camino crítico, ~5 días). **Sin bloqueos.**
+**Última actualización:** 2026-04-30 al cerrar Fase 2.
+
+### Capa de auditoría lista (Fase 2)
+
+- `src/core/constantes.py` — taxonomías inmutables (8 SCIAN objetivo, 4 canales, 13 entidades priorizadas, bbox MX, estados pipeline).
+- `src/audit/models.py` — `Hallazgo` y `ReporteAuditoria` (Pydantic frozen).
+- `src/audit/duplicates.py` — CLEE, hash_dedup, fuzzy nombre+dirección con rapidfuzz.
+- `src/audit/completeness.py` — columnas críticas, % NULL por columna, sin contacto.
+- `src/audit/geo_anomalies.py` — coords nulas/cero, fuera bbox MX, lat/lon invertidas, geom desync.
+- `src/audit/scian.py` — SCIAN objetivo, canal coherente con SCIAN, canales no vacío, distribución info.
+- `src/audit/contacto.py` — teléfono MX (con normalización +52), email, direcciones sospechosas, anio_alta razonable.
+- `src/audit/runner.py` — `run_all()` orquesta 18 chequeos, `run_subset()` y `omitir`.
+- `docs/auditoria/criterios_calidad.md` — política severidad: error / warning / info.
+- `notebooks/02_auditoria_denue.ipynb` — visualización gradient_red sobre la tabla.
+- **39 tests nuevos** (test_audit_*.py) — total **50 tests** pasan, ruff limpio.
 
 ### Google Cloud setup (2026-04-30)
 

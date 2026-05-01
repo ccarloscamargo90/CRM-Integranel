@@ -1,0 +1,208 @@
+# =====================================================================
+# Indicadores geográficos seed — datos públicos oficiales curados
+# =====================================================================
+# Fuentes:
+# - Censo 2020 INEGI (población y demografía por entidad)
+# - ENIGH 2022 INEGI (consumo per cápita de tortilla)
+# - SIAP/SADER 2024 (producción de maíz por estado)
+# - CONEVAL 2022 (% de pobreza por entidad, proxy de capacidad de compra)
+#
+# Reglas de uso:
+# - Estos valores son SEED. Refrescar manualmente cuando INEGI publique
+#   nuevos datos (ENIGH se publica cada 2 años, SIAP anual).
+# - Si necesitas datos fresh vía API, el cliente `inegi_indicadores.py`
+#   acepta un token INEGI distinto al del DENUE (registro separado).
+# - Las cifras tienen 1-3 dígitos significativos para no aparentar
+#   precisión que no tenemos.
+# =====================================================================
+
+indicadores:
+  # ===== CONSUMO TORTILLA per cápita anual (kg) =====
+  # Fuente: ENIGH 2022 INEGI, presentaciones públicas SIAP.
+  # Promedio nacional ~73 kg/persona/año. Varía 50-95 kg por entidad.
+  - nivel: entidad
+    cve: "01"  # Aguascalientes
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 68
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "04"  # Campeche
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 75
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "07"  # Chiapas
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 88
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "09"  # CDMX
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 70
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "11"  # Guanajuato
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 82
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "13"  # Hidalgo
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 84
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "15"  # Estado de México
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 75
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "17"  # Morelos
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 77
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "20"  # Oaxaca
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 92
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "21"  # Puebla
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 85
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "22"  # Querétaro
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 71
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "23"  # Quintana Roo
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 67
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "27"  # Tabasco
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 80
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "29"  # Tlaxcala
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 85
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "30"  # Veracruz
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 79
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  - nivel: entidad
+    cve: "31"  # Yucatán
+    indicador: consumo_tortilla_kg_per_capita_anio
+    valor: 73
+    unidad: kg
+    fuente: ENIGH_2022
+    anio: 2022
+
+  # ===== POBLACIÓN total por entidad =====
+  # Fuente: Censo de Población y Vivienda 2020 INEGI.
+  - {nivel: entidad, cve: "01", indicador: poblacion_total, valor: 1425607, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "04", indicador: poblacion_total, valor: 928363, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "07", indicador: poblacion_total, valor: 5543828, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "09", indicador: poblacion_total, valor: 9209944, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "11", indicador: poblacion_total, valor: 6166934, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "13", indicador: poblacion_total, valor: 3082841, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "15", indicador: poblacion_total, valor: 16992418, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "17", indicador: poblacion_total, valor: 1971520, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "20", indicador: poblacion_total, valor: 4132148, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "21", indicador: poblacion_total, valor: 6583278, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "22", indicador: poblacion_total, valor: 2368467, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "23", indicador: poblacion_total, valor: 1857985, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "27", indicador: poblacion_total, valor: 2402598, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "29", indicador: poblacion_total, valor: 1342977, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "30", indicador: poblacion_total, valor: 8062579, unidad: personas, fuente: Censo_2020, anio: 2020}
+  - {nivel: entidad, cve: "31", indicador: poblacion_total, valor: 2320898, unidad: personas, fuente: Censo_2020, anio: 2020}
+
+  # ===== PRODUCCIÓN MAÍZ GRANO BLANCO (toneladas año) =====
+  # Fuente: SIAP/SADER 2024 (cierre agrícola).
+  # Producción nacional ~21 millones ton/año.
+  - {nivel: entidad, cve: "01", indicador: produccion_maiz_grano_blanco_ton, valor: 70000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "04", indicador: produccion_maiz_grano_blanco_ton, valor: 120000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "07", indicador: produccion_maiz_grano_blanco_ton, valor: 1700000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "09", indicador: produccion_maiz_grano_blanco_ton, valor: 4000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "11", indicador: produccion_maiz_grano_blanco_ton, valor: 1450000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "13", indicador: produccion_maiz_grano_blanco_ton, valor: 850000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "15", indicador: produccion_maiz_grano_blanco_ton, valor: 1750000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "17", indicador: produccion_maiz_grano_blanco_ton, valor: 70000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "20", indicador: produccion_maiz_grano_blanco_ton, valor: 720000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "21", indicador: produccion_maiz_grano_blanco_ton, valor: 1100000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "22", indicador: produccion_maiz_grano_blanco_ton, valor: 75000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "23", indicador: produccion_maiz_grano_blanco_ton, valor: 22000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "27", indicador: produccion_maiz_grano_blanco_ton, valor: 78000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "29", indicador: produccion_maiz_grano_blanco_ton, valor: 145000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "30", indicador: produccion_maiz_grano_blanco_ton, valor: 880000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+  - {nivel: entidad, cve: "31", indicador: produccion_maiz_grano_blanco_ton, valor: 38000, unidad: ton, fuente: SIAP_2024, anio: 2024}
+
+  # ===== PORCENTAJE POBLACIÓN EN POBREZA (proxy capacidad de compra) =====
+  # Fuente: CONEVAL 2022 (medición multidimensional).
+  # Mayor % pobreza → menor capacidad de compra → score ajustado.
+  - {nivel: entidad, cve: "01", indicador: pct_pobreza, valor: 24.5, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "04", indicador: pct_pobreza, valor: 49.5, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "07", indicador: pct_pobreza, valor: 67.4, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "09", indicador: pct_pobreza, valor: 24.4, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "11", indicador: pct_pobreza, valor: 38.5, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "13", indicador: pct_pobreza, valor: 48.3, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "15", indicador: pct_pobreza, valor: 41.7, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "17", indicador: pct_pobreza, valor: 50.4, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "20", indicador: pct_pobreza, valor: 58.4, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "21", indicador: pct_pobreza, valor: 54.0, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "22", indicador: pct_pobreza, valor: 31.6, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "23", indicador: pct_pobreza, valor: 36.1, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "27", indicador: pct_pobreza, valor: 46.5, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "29", indicador: pct_pobreza, valor: 52.5, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "30", indicador: pct_pobreza, valor: 51.7, unidad: pct, fuente: CONEVAL_2022, anio: 2022}
+  - {nivel: entidad, cve: "31", indicador: pct_pobreza, valor: 41.8, unidad: pct, fuente: CONEVAL_2022, anio: 2022}

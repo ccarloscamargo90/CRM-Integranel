@@ -138,6 +138,48 @@ def _cmd_enriquecer(*, max_total: int | None) -> int:
     return 0 if resumen.errores == 0 else 2
 
 
+def _cmd_cargar_agebs(shp_path: str, cve_entidad: str | None = None) -> int:
+    setup_logging()
+    from src.ingestion.marco_geoestadistico import cargar_shapefile_a_agebs
+
+    with SessionLocal() as session:
+        m = cargar_shapefile_a_agebs(session, shp_path, cve_entidad=cve_entidad)
+    print("\n=== AGEBs cargados ===")
+    print(f"Filas leídas:      {m.get('filas_leidas',0):,}")
+    print(f"Filas insertadas:  {m.get('filas_insertadas',0):,}")
+    print(f"Encoding origen:   {m.get('encoding_origen','?')}")
+    return 0
+
+
+def _cmd_asignar_agebs() -> int:
+    setup_logging()
+    from src.ingestion.marco_geoestadistico import asignar_ageb_a_establecimientos
+
+    with SessionLocal() as session:
+        m = asignar_ageb_a_establecimientos(session)
+    print("\n=== Spatial join establecimientos ↔ AGEBs ===")
+    print(f"AGEBs en DB:                 {m['total_agebs_en_db']:,}")
+    print(f"Establecimientos con geom:   {m['establecimientos_con_geom']:,}")
+    print(f"  → asignados a AGEB:        {m['establecimientos_con_ageb']:,}")
+    print(f"  → actualizados esta corrida:{m['actualizados']:,}")
+    return 0
+
+
+def _cmd_cargar_indicadores() -> int:
+    setup_logging()
+    from src.ingestion.inegi_indicadores import cargar_desde_seed
+
+    with SessionLocal() as session:
+        m = cargar_desde_seed(session)
+
+    print("\n=== Indicadores geográficos cargados ===")
+    print(f"Total upserteados: {m['upserteados']:,}")
+    print("Por indicador:")
+    for ind, n in sorted(m["por_indicador"].items(), key=lambda x: -x[1]):
+        print(f"  {ind:<45} {n:>3}")
+    return 0
+
+
 def _cmd_descargar_69b() -> int:
     setup_logging()
     from src.ingestion.sat_publica import descargar_y_persistir
@@ -203,6 +245,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--incluir-marca", action="store_true", help="También usar heurística de marca residual (ruidosa)")
     parser.add_argument("--descargar-69b", action="store_true", help="Descarga Lista 69-B SAT y persiste en DB")
     parser.add_argument("--cruzar-69b", action="store_true", help="Cruce establecimientos.rfc vs lista 69-B SAT")
+    parser.add_argument("--cargar-indicadores", action="store_true", help="Carga indicadores geográficos desde seed YAML")
+    parser.add_argument("--cargar-agebs", help="Path a shapefile INEGI Marco Geoestadístico para cargar")
+    parser.add_argument("--cve-entidad", help="Filtra carga AGEB a una entidad (ej. 22)")
+    parser.add_argument("--asignar-agebs", action="store_true", help="Spatial join establecimientos ↔ agebs")
     parser.add_argument("--gasto", action="store_true", help="Reporta gasto del mes en Google Places")
 
     parser.add_argument(
@@ -221,6 +267,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_descargar_69b()
     if args.cruzar_69b:
         return _cmd_cruzar_69b()
+    if args.cargar_indicadores:
+        return _cmd_cargar_indicadores()
+    if args.cargar_agebs:
+        return _cmd_cargar_agebs(args.cargar_agebs, cve_entidad=args.cve_entidad)
+    if args.asignar_agebs:
+        return _cmd_asignar_agebs()
     if args.detectar_cadenas:
         return _cmd_detectar_cadenas(incluir_marca=args.incluir_marca)
     if args.enriquecer:

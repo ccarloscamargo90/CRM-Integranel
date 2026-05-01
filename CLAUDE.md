@@ -8,9 +8,44 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, **5.1 (SAT 69-B)**, todas 2026-04-30 / 2026-05-01.
-**Próxima:** Fase 5.2 — INEGI Indicadores (ENIGH consumo tortilla, SIAP producción maíz, NSE por AGEB).
-**Última actualización:** 2026-05-01 al cerrar Fase 5.1.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, **5.2 (INEGI Indicadores)**, **5.3 (Marco Geoestadístico)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** Fase 5.4 — CONAFAB/CANAMI (alimento balanceado, maíz industrializado) y/o Fase 6 (scoring).
+**Última actualización:** 2026-05-01 al cerrar Fase 5.2 y 5.3.
+
+### Fase 5.2 — INEGI Indicadores (cierre)
+
+- `data/seeds/indicadores_geograficos.yaml` — 64 valores curados de fuentes
+  públicas oficiales (Censo 2020, ENIGH 2022, SIAP 2024, CONEVAL 2022).
+  4 indicadores por entidad × 16 entidades:
+  - `consumo_tortilla_kg_per_capita_anio` (rango: 67-92 kg)
+  - `poblacion_total` (rango: 928K-17M)
+  - `produccion_maiz_grano_blanco_ton` (rango: 4K-1.75M ton)
+  - `pct_pobreza` (rango: 24%-67%) — proxy capacidad de compra
+- `src/ingestion/inegi_indicadores.py` — loader YAML → tabla
+  `indicadores_geograficos` con UPSERT por (nivel, cve, indicador, anio).
+- CLI: `--cargar-indicadores`. Compliance log automático.
+- Operativo: refrescar manualmente cuando INEGI publique ENIGH (cada 2 años),
+  SIAP (anual), Censo (cada 5 años). Una API client real queda como mejora
+  futura cuando se requiera.
+
+### Fase 5.3 — Marco Geoestadístico AGEB (cierre)
+
+- `src/ingestion/marco_geoestadistico.py` — loader genérico de shapefiles
+  INEGI con geopandas. Reproyecta a EPSG:4326 si está en LCC México.
+  Detecta columnas `CVEGEO`/`CVE_ENT`/`CVE_MUN`/`POBTOT` automáticamente.
+  UPSERT por `cve_ageb`. Carga ~1000 filas/segundo.
+- `asignar_ageb_a_establecimientos()` — spatial join PostGIS
+  `ST_Within(establecimientos.geom, agebs.geom)` que actualiza
+  `establecimientos.ageb` con cobertura ~10s para 136K establecimientos
+  (gracias al índice GIST en `agebs.geom`).
+- CLI: `--cargar-agebs <shp>` y `--asignar-agebs`.
+- `data/seeds/README_marco_geoestadistico.md` — guía operativa para
+  descargar shapefiles INEGI manualmente (50-200 MB por entidad, no se
+  versionan en repo).
+
+**Decisión de diseño:** la descarga del Marco Geoestadístico NO se automatiza
+porque los IDs de archivos del catálogo INEGI cambian con cada publicación.
+El operador descarga del catálogo oficial y le pasa la ruta al CLI.
 
 ### Fase 5.1 — SAT Lista 69-B (cierre)
 

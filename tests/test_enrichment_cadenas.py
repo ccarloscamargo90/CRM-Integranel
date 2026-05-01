@@ -40,45 +40,58 @@ def test_clave_marca_filtra_2_chars():
     assert _clave_marca("ab cd ef esperanza") == "esperanza"
 
 
-def test_detectar_cadenas_3_sucursales(db):
-    """3 establecimientos con misma marca → cadena creada."""
+def test_detectar_cadenas_corporativas_por_razon_social(db):
+    """3 establecimientos con misma razón social → cadena corporativa."""
     for i in range(3):
         _crear_est(
             db,
-            hash_dedup=f"chain-{i}",
-            nombre=f"Tortillería La Esperanza {i+1}",
-            nombre_norm=f"tortilleria la esperanza {i+1}",
+            hash_dedup=f"corp-{i}",
+            nombre=f"Sucursal {i+1}",
+            razon_social="ALIMENTOS PLIEGO SA DE CV",
         )
     detectar_cadenas(db)
     db.flush()
 
     cadenas = db.execute(select(Cadena)).scalars().all()
-    assert len(cadenas) >= 1
-    cadena = next((c for c in cadenas if "esperanza" in c.nombre_grupo_norm), None)
+    cadena = next((c for c in cadenas if "alimentos pliego" in c.nombre_grupo_norm), None)
     assert cadena is not None
     assert cadena.sucursales_count == 3
-    assert cadena.canal_principal == "Tortillerias"
+    assert cadena.tipo == "cadena_corporativa"
 
-    # Verifica que los 3 establecimientos quedaron vinculados
-    vinculados = db.execute(
-        select(Establecimiento).where(Establecimiento.cadena_id == cadena.id)
-    ).scalars().all()
-    assert len(vinculados) == 3
+
+def test_detectar_cadenas_marca_solo_si_se_pide(db):
+    """Sin `incluir_marca_residual`, no agrupa por marca residual."""
+    for i in range(3):
+        _crear_est(
+            db,
+            hash_dedup=f"marca-{i}",
+            nombre=f"Tortillería La Esperanza {i+1}",
+            nombre_norm=f"tortilleria la esperanza {i+1}",
+        )
+    detectar_cadenas(db)
+    cadenas = db.execute(select(Cadena)).scalars().all()
+    assert not any("esperanza" in (c.nombre_grupo_norm or "") for c in cadenas)
+
+    detectar_cadenas(db, incluir_marca_residual=True)
+    cadenas = db.execute(select(Cadena)).scalars().all()
+    cadena = next((c for c in cadenas if "esperanza" in (c.nombre_grupo_norm or "")), None)
+    assert cadena is not None
+    assert cadena.tipo == "heuristica"
 
 
 def test_detectar_cadenas_2_no_es_cadena(db):
-    """2 establecimientos con misma marca → NO es cadena (umbral=3)."""
+    """2 establecimientos con misma razón social → NO es cadena (umbral=3)."""
     for i in range(2):
         _crear_est(
             db,
             hash_dedup=f"single-{i}",
             nombre=f"Tortillería Sola {i+1}",
-            nombre_norm=f"tortilleria sola {i+1}",
+            razon_social="EMPRESA CHICA SA DE CV",
         )
     detectar_cadenas(db)
     cadenas = db.execute(select(Cadena)).scalars().all()
-    cadena_sola = next((c for c in cadenas if "sola" in c.nombre_grupo_norm), None)
-    assert cadena_sola is None
+    cadena = next((c for c in cadenas if "empresa chica" in c.nombre_grupo_norm), None)
+    assert cadena is None
 
 
 def test_detectar_cadenas_idempotente(db):
@@ -87,8 +100,8 @@ def test_detectar_cadenas_idempotente(db):
         _crear_est(
             db,
             hash_dedup=f"idem-{i}",
-            nombre=f"Tortillería La Esperanza {i+1}",
-            nombre_norm=f"tortilleria la esperanza {i+1}",
+            nombre=f"Sucursal {i+1}",
+            razon_social="MOLINERA TEST SA DE CV",
         )
     detectar_cadenas(db)
     n_cadenas_1 = db.execute(select(Cadena)).scalars().all()

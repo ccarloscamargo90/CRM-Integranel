@@ -1,17 +1,19 @@
-"""Detector de cadenas — agrupa establecimientos con nombre similar dentro
-del mismo SCIAN.
+"""Detector de cadenas — dos estrategias en orden de confianza.
 
-Heurística simple, escalable:
-1. Para cada SCIAN objetivo, leer (id, nombre_norm, municipio_codigo).
-2. Bloque por SCIAN.
-3. Dentro del bloque, agrupar por una **clave normalizada**:
-   - Quitar palabras genéricas frecuentes (TORTILLERIA, MOLINO, LA, EL, DEL, etc.)
-   - Si la "marca" residual aparece en ≥3 establecimientos → cadena.
-4. Persistir en `cadenas` y vincular con `establecimientos.cadena_id`.
+**Estrategia 1 (alta confianza): razón social compartida.**
+Si dos o más establecimientos comparten `raz_social` no nula, son **la misma
+empresa legal**. Esto identifica cadenas reales como BACHOCO, PURINA,
+INDUSTRIAS DEL MAÍZ PUEBLA, MOLINERA DE MÉXICO. Solo ~4% del DENUE tiene
+razón social, pero entre ellos están los clientes corporativos.
 
-Esta heurística es deliberadamente conservadora — prefiere falsos negativos
-(no agrupar) sobre falsos positivos (agrupar mal). El refinamiento con fuzzy
-queda para Fase 6 cuando tengamos data real para validar.
+**Estrategia 2 (baja confianza, fallback): marca residual del nombre.**
+Para los ~96% sin razón social, agrupa por "marca" tras quitar palabras
+genéricas. Útil para detectar tortillerías locales con varias sucursales,
+pero produce falsos positivos: "La Lupita" / "La Guadalupana" son nombres
+muy comunes con dueños distintos. NO se usa por defecto; queda como
+opción explícita (`incluir_marca_residual=True`).
+
+`detectar_cadenas` ejecuta solo estrategia 1 por defecto (precisión > recall).
 """
 
 from __future__ import annotations
@@ -90,86 +92,180 @@ def _clave_marca(nombre_norm: str) -> str | None:
     return " ".join(significativos)
 
 
-def detectar_cadenas(session: Session, *, umbral: int = _UMBRAL_SUCURSALES) -> dict:
-    """Recorre los SCIAN objetivo, agrupa por marca, persiste cadenas con ≥ `umbral` sucursales.
-
-    Devuelve métricas {scian: {cadenas_creadas, sucursales_vinculadas}}.
+def _normaliza_razon_social(raz: str | None) -> str | None:
+    """Normaliza la razón social: lowercase, sin acentos, espacios colapsados.
+    Usa la misma normalización del nombre para que comparaciones sean estables.
     """
-    metricas: dict[str, dict[str, int]] = {}
-    cadenas_creadas_total = 0
-    sucursales_vinculadas_total = 0
+    if not raz or not raz.strip():
+        return None
+    from src.core.heuristicas import normaliza_nombre
 
-    for scian in sorted(SCIAN_PRIMARIOS):
-        rows = session.execute(
-            select(Establecimiento.id, Establecimiento.nombre, Establecimiento.nombre_norm)
-            .where(Establecimiento.scian_codigo == scian)
-        ).all()
+    return normaliza_nombre(raz)
 
-        # Agrupar por marca
-        grupos: dict[str, list[tuple[int, str]]] = defaultdict(list)
-        for r in rows:
-            marca = _clave_marca(r.nombre_norm or "")
-            if marca:
-                grupos[marca].append((r.id, r.nombre))
 
-        n_cadenas = 0
-        n_vinculados = 0
-        canal = canal_de_scian(scian)
+def detectar_cadenas(
+    session: Session,
+    *,
+    umbral: int = _UMBRAL_SUCURSALES,
+    incluir_marca_residual: bool = False,
+) -> dict:
+    """Detecta cadenas con dos estrategias.
 
-        for marca, ests in grupos.items():
-            if len(ests) < umbral:
-                continue
-            # Tomamos el nombre más frecuente como `nombre_grupo` legible
-            nombre_grupo_legible = ests[0][1].strip().title()
-            # Verificar si ya existe la cadena
-            existente = session.execute(
-                select(Cadena).where(Cadena.nombre_grupo_norm == marca)
-            ).scalar_one_or_none()
+    1. Por **razón social compartida** (alta confianza). Default ON.
+    2. Por **marca residual del nombre** (baja confianza, opcional).
 
-            if existente:
-                cadena = existente
-            else:
-                cadena = Cadena(
-                    nombre_grupo=nombre_grupo_legible,
-                    nombre_grupo_norm=marca,
-                    canal_principal=canal,
-                    sucursales_count=len(ests),
-                    tipo="cadena_local",
-                )
-                session.add(cadena)
-                session.flush()
-                n_cadenas += 1
+    `umbral`: mínimo de sucursales para considerarse cadena.
+    `incluir_marca_residual`: si True, agrega cadenas heurísticas (con
+    `tipo='heuristica'`); útil para descubrimiento amplio pero ruidoso.
 
-            # Vincular establecimientos a la cadena
-            ids = [e[0] for e in ests]
-            session.execute(
-                text(
-                    "UPDATE establecimientos SET cadena_id = :cid, grupo_marca = :gm "
-                    "WHERE id = ANY(:ids)"
-                ),
-                {"cid": cadena.id, "gm": marca, "ids": ids},
+    Devuelve métricas agregadas.
+    """
+    n_cadenas_razon = 0
+    n_vinculados_razon = 0
+    n_cadenas_marca = 0
+    n_vinculados_marca = 0
+    metricas_por_scian: dict[str, dict[str, int]] = {}
+
+    # ---------- Estrategia 1: razón social ----------
+    rows = session.execute(
+        select(
+            Establecimiento.id,
+            Establecimiento.razon_social,
+            Establecimiento.nombre,
+            Establecimiento.scian_codigo,
+        ).where(
+            Establecimiento.scian_codigo.in_(SCIAN_PRIMARIOS),
+            Establecimiento.razon_social.is_not(None),
+            Establecimiento.razon_social != "",
+        )
+    ).all()
+
+    grupos_razon: dict[str, list[tuple[int, str, str]]] = defaultdict(list)
+    for r in rows:
+        clave = _normaliza_razon_social(r.razon_social)
+        if clave:
+            grupos_razon[clave].append((r.id, r.nombre, r.scian_codigo))
+
+    for clave, ests in grupos_razon.items():
+        if len(ests) < umbral:
+            continue
+        # SCIAN dominante del grupo determina el canal
+        from collections import Counter
+
+        scian_dominante = Counter(e[2] for e in ests).most_common(1)[0][0]
+        canal = canal_de_scian(scian_dominante)
+        # Razón social legible del primer establecimiento (suele ser representativa)
+        razon_legible = next(
+            (e[1] for e in ests if e[1]),
+            ests[0][1] or clave,
+        )
+        # `nombre_grupo` = razón social formatted; `nombre_grupo_norm` = clave normalizada
+        existente = session.execute(
+            select(Cadena).where(Cadena.nombre_grupo_norm == clave)
+        ).scalar_one_or_none()
+        if existente:
+            cadena = existente
+            cadena.tipo = "cadena_corporativa"
+            cadena.canal_principal = canal
+        else:
+            cadena = Cadena(
+                nombre_grupo=razon_legible.strip().title()[:200],
+                nombre_grupo_norm=clave,
+                canal_principal=canal,
+                sucursales_count=len(ests),
+                tipo="cadena_corporativa",
             )
-            cadena.sucursales_count = len(ests)
-            n_vinculados += len(ests)
+            session.add(cadena)
+            session.flush()
+            n_cadenas_razon += 1
 
-        metricas[scian] = {
-            "cadenas_creadas": n_cadenas,
-            "sucursales_vinculadas": n_vinculados,
-        }
-        cadenas_creadas_total += n_cadenas
-        sucursales_vinculadas_total += n_vinculados
+        ids = [e[0] for e in ests]
+        session.execute(
+            text(
+                "UPDATE establecimientos SET cadena_id = :cid, grupo_marca = :gm "
+                "WHERE id = ANY(:ids)"
+            ),
+            {"cid": cadena.id, "gm": clave, "ids": ids},
+        )
+        cadena.sucursales_count = len(ests)
+        n_vinculados_razon += len(ests)
+
+        # Métricas por SCIAN dominante
+        metricas_por_scian.setdefault(scian_dominante, {"corporativas": 0, "heuristicas": 0})
+        metricas_por_scian[scian_dominante]["corporativas"] += 1
+
+    logger.info(
+        "Estrategia razón social: {c} cadenas corporativas, {v} sucursales",
+        c=n_cadenas_razon, v=n_vinculados_razon,
+    )
+
+    # ---------- Estrategia 2 (opcional): marca residual ----------
+    if incluir_marca_residual:
+        for scian in sorted(SCIAN_PRIMARIOS):
+            rows = session.execute(
+                select(
+                    Establecimiento.id,
+                    Establecimiento.nombre,
+                    Establecimiento.nombre_norm,
+                ).where(
+                    Establecimiento.scian_codigo == scian,
+                    Establecimiento.cadena_id.is_(None),  # solo los no vinculados aún
+                )
+            ).all()
+
+            grupos: dict[str, list[tuple[int, str]]] = defaultdict(list)
+            for r in rows:
+                marca = _clave_marca(r.nombre_norm or "")
+                if marca:
+                    grupos[marca].append((r.id, r.nombre))
+
+            canal = canal_de_scian(scian)
+            for marca, ests in grupos.items():
+                if len(ests) < umbral:
+                    continue
+                nombre_legible = ests[0][1].strip().title()
+                existente = session.execute(
+                    select(Cadena).where(Cadena.nombre_grupo_norm == marca)
+                ).scalar_one_or_none()
+                if existente:
+                    cadena = existente
+                else:
+                    cadena = Cadena(
+                        nombre_grupo=nombre_legible[:200],
+                        nombre_grupo_norm=marca,
+                        canal_principal=canal,
+                        sucursales_count=len(ests),
+                        tipo="heuristica",
+                    )
+                    session.add(cadena)
+                    session.flush()
+                    n_cadenas_marca += 1
+
+                ids = [e[0] for e in ests]
+                session.execute(
+                    text(
+                        "UPDATE establecimientos SET cadena_id = :cid, grupo_marca = :gm "
+                        "WHERE id = ANY(:ids) AND cadena_id IS NULL"
+                    ),
+                    {"cid": cadena.id, "gm": marca, "ids": ids},
+                )
+                cadena.sucursales_count = len(ests)
+                n_vinculados_marca += len(ests)
+
+                metricas_por_scian.setdefault(scian, {"corporativas": 0, "heuristicas": 0})
+                metricas_por_scian[scian]["heuristicas"] += 1
 
         logger.info(
-            "SCIAN {scian}: {n_cad} cadenas nuevas, {n_suc} sucursales vinculadas",
-            scian=scian,
-            n_cad=n_cadenas,
-            n_suc=n_vinculados,
+            "Estrategia marca residual: {c} cadenas heurísticas, {v} sucursales",
+            c=n_cadenas_marca, v=n_vinculados_marca,
         )
 
     return {
-        "por_scian": metricas,
-        "cadenas_creadas_total": cadenas_creadas_total,
-        "sucursales_vinculadas_total": sucursales_vinculadas_total,
+        "cadenas_corporativas": n_cadenas_razon,
+        "sucursales_corporativas": n_vinculados_razon,
+        "cadenas_heuristicas": n_cadenas_marca,
+        "sucursales_heuristicas": n_vinculados_marca,
+        "por_scian": metricas_por_scian,
     }
 
 

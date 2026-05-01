@@ -92,24 +92,27 @@ def _cmd_descarga(
     return 0
 
 
-def _cmd_detectar_cadenas() -> int:
+def _cmd_detectar_cadenas(*, incluir_marca: bool = False) -> int:
     setup_logging()
     from src.enrichment.cadenas import detectar_cadenas, listar_top_cadenas
 
     with SessionLocal() as session:
-        metricas = detectar_cadenas(session)
+        metricas = detectar_cadenas(session, incluir_marca_residual=incluir_marca)
         session.commit()
 
-        print("\n=== Resumen de cadenas detectadas ===")
-        print(f"Total cadenas creadas:        {metricas['cadenas_creadas_total']:,}")
-        print(f"Sucursales vinculadas:        {metricas['sucursales_vinculadas_total']:,}")
-        print("\nPor SCIAN:")
-        for scian, m in metricas["por_scian"].items():
-            print(f"  {scian}  cadenas={m['cadenas_creadas']:>4}  sucursales={m['sucursales_vinculadas']:>5}")
+        print("\n=== Resumen ===")
+        print(f"Cadenas corporativas (por razón social):  {metricas['cadenas_corporativas']:,}")
+        print(f"  Sucursales vinculadas:                  {metricas['sucursales_corporativas']:,}")
+        if incluir_marca:
+            print(f"Cadenas heurísticas (por marca):          {metricas['cadenas_heuristicas']:,}")
+            print(f"  Sucursales vinculadas:                  {metricas['sucursales_heuristicas']:,}")
 
-        print("\n=== Top 15 cadenas ===")
-        for c in listar_top_cadenas(session, top=15):
-            print(f"  {c['n_sucursales']:>4} suc  {c['n_estados']} estados  | {c['canal'][:25]:25} | {c['nombre_grupo'][:40]}")
+        print("\n=== Top 20 cadenas ===")
+        for c in listar_top_cadenas(session, top=20):
+            print(
+                f"  {c['n_sucursales']:>4} suc  {c['n_estados']} edos  | "
+                f"{(c['canal'] or '?'):<25} | {c['nombre_grupo'][:50]}"
+            )
     return 0
 
 
@@ -159,7 +162,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Enriquecimiento
     parser.add_argument("--enriquecer", action="store_true", help="Enriquecimiento D3.B con Google Places")
-    parser.add_argument("--detectar-cadenas", action="store_true", help="Detectar cadenas por nombre normalizado")
+    parser.add_argument("--detectar-cadenas", action="store_true", help="Detectar cadenas por razón social")
+    parser.add_argument("--incluir-marca", action="store_true", help="También usar heurística de marca residual (ruidosa)")
     parser.add_argument("--gasto", action="store_true", help="Reporta gasto del mes en Google Places")
 
     parser.add_argument(
@@ -175,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.gasto:
         return _cmd_gasto()
     if args.detectar_cadenas:
-        return _cmd_detectar_cadenas()
+        return _cmd_detectar_cadenas(incluir_marca=args.incluir_marca)
     if args.enriquecer:
         return _cmd_enriquecer(max_total=args.max_total)
     if args.full:

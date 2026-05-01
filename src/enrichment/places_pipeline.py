@@ -54,8 +54,8 @@ def _ya_enriquecido(session: Session, est_id: int) -> bool:
 def seleccionar_candidatos_d3b(
     session: Session,
     *,
-    max_tortillerias: int = 500,
-    max_cadenas: int = 20,
+    max_tortillerias: int = 0,
+    max_cadenas: int = 200,
     solo_priorizados: bool = True,
 ) -> list[Establecimiento]:
     """Selección D3.B priorizada: ~3,000 establecimientos para ~$15 USD.
@@ -100,11 +100,13 @@ def seleccionar_candidatos_d3b(
     _add(list(rows))
     logger.info("Candidatos Asociaciones: {n}", n=len(rows))
 
-    # 3. Sucursales de las top `max_cadenas` cadenas más grandes
+    # 3. Sucursales de las top `max_cadenas` cadenas CORPORATIVAS (razón social compartida).
+    # Excluye cadenas heurísticas (nombres genéricos coincidentes que no son misma empresa).
     from src.core.models import Cadena
 
     top_cadenas_ids = session.execute(
         select(Cadena.id)
+        .where(Cadena.tipo == "cadena_corporativa")
         .order_by(Cadena.sucursales_count.desc())
         .limit(max_cadenas)
     ).scalars().all()
@@ -115,7 +117,7 @@ def seleccionar_candidatos_d3b(
         ).scalars().all()
         _add(list(rows))
         logger.info(
-            "Candidatos top {tc} cadenas: {n} sucursales",
+            "Candidatos top {tc} cadenas corporativas: {n} sucursales",
             tc=max_cadenas, n=len(rows),
         )
 

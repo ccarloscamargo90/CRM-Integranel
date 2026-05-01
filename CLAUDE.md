@@ -8,9 +8,69 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, **7 (LFPDPPP + ARCO)**, todas 2026-04-30 / 2026-05-01.
-**Próxima:** Fase 8 — API FastAPI + Dashboard server-rendered (Jinja+HTMX) + deploy Render.
-**Última actualización:** 2026-05-01 al cerrar Fase 7.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, 7, **8.A (API REST)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** Fase 8.B — Dashboard server-rendered (Jinja+HTMX) + mapa Leaflet.
+**Última actualización:** 2026-05-01 al cerrar Fase 8.A.
+
+### Fase 8.A — API REST FastAPI con auth (cierre)
+
+**Auth (`src/api/auth.py`):**
+- `hash_password` / `verify_password` con **bcrypt directo** (no passlib —
+  passlib 1.7.4 no soporta bcrypt 5.x). Trunca a 72 bytes (límite del algoritmo).
+- `crear_jwt` / `decodificar_jwt` con HS256 + `JWT_SECRET_KEY` desde `.env`.
+  Expiración configurable, default 480 minutos (8 horas).
+- `JWT_SECRET_KEY` y `SECRET_KEY` generados con `secrets.token_urlsafe(64)`
+  y guardados en `.env` (gitignored).
+
+**Dependencias FastAPI (`src/api/dependencies.py`):**
+- `get_db` — sesión SQLAlchemy por request.
+- `get_current_user` — lee cookie `crm_token`, valida JWT, devuelve `Usuario` activo.
+- `require_role(*roles)` — factory de dependencia para autorización por rol.
+
+**Rutas:**
+- `POST /auth/login` — username + password, setea cookie httpOnly + Secure
+  (Secure solo en producción), SameSite=Lax, max-age = `JWT_EXPIRE_MINUTES`.
+- `POST /auth/logout` — borra cookie.
+- `GET /auth/me` — info del usuario actual.
+- `GET /prospectos` — listado con filtros canal/segmento/estado_pipeline/
+  estado_codigo/score_min/riesgo_69b. **Vendedor solo ve sus prospectos
+  asignados.** Order by `score_prioridad DESC NULLS LAST`. Paginación
+  `limit (1-500, default 50)` + `offset`.
+- `GET /prospectos/{id}` — detalle completo (incluye PII teléfono, email,
+  contacto). **Compliance log automático** con base legal "Interés legítimo
+  comercial B2B + relación laboral con Intergranel".
+- `POST /prospectos/{id}/contacto` — registra `Interaccion` (visita/llamada/
+  email/whatsapp/cotizacion/pedido/muestra/seguimiento). Opcionalmente
+  cambia `estado_pipeline` y registra fila en `pipeline_etapa_historial`.
+
+**App (`src/api/main.py`):** FastAPI con CORS configurable, lifespan, /health, /.
+
+**Seed inicial (`scripts/seed_admin.py`):** Idempotente. Si no se pasan args,
+genera password aleatorio con `secrets.token_urlsafe(16)` y lo imprime una
+sola vez. Si ya existe el usuario, lo deja.
+
+**Tests (20 nuevos):**
+- 8 en `test_api_auth.py` — login OK/wrong-password/inactivo/inexistente,
+  /me con/sin cookie, logout, token inválido.
+- 12 en `test_api_prospectos.py` — listado sin auth (401), admin ve todos,
+  vendedor solo los suyos, filtros segmento/canal, detalle 200/404/403,
+  contacto crea interacción + cambia pipeline + 403 ajeno + 422 tipo inválido.
+
+**Total 170/170 tests pasan, ruff limpio.**
+
+**Smoke real (uvicorn local):**
+- Login admin: 200, cookie httpOnly OK.
+- /auth/me con cookie: 200.
+- /prospectos sin auth: 401.
+- /prospectos?segmento=A&limit=3: 27,951 totales, top MALTA TEXO/AGRIBRANDS
+  PURINA/ALBAPESA con score 100 + etiqueta CONAFAB.
+- /prospectos/{id}: detalle real con rating Google ★3.9.
+- /docs: Swagger UI funciona.
+- 8 rutas en OpenAPI.
+
+**Modelo `Establecimiento` actualizado:** se agregó `etiquetas TEXT[]` que
+faltaba en el ORM aunque la migración 9602d1aaf900 ya había agregado la
+columna a la BD.
 
 ### Fase 7 — Aviso privacidad LFPDPPP + ARCO (cierre)
 

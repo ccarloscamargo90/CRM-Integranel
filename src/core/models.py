@@ -222,6 +222,9 @@ class Establecimiento(Base):
     fuentes: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::TEXT[]")
     )
+    etiquetas: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::TEXT[]")
+    )
     fecha_alta: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("NOW()"), nullable=False
     )

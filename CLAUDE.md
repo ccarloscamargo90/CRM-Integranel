@@ -8,9 +8,45 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, **5.4+5.5 (fuentes complementarias)**, **6 (scoring)**, todas 2026-04-30 / 2026-05-01.
-**Próxima:** Fase 7 (Aviso privacidad LFPDPPP + ARCO) y Fase 8 (API + Dashboard + Deploy).
-**Última actualización:** 2026-05-01 al cerrar Fases 5.4, 5.5 y 6.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, **7 (LFPDPPP + ARCO)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** Fase 8 — API FastAPI + Dashboard server-rendered (Jinja+HTMX) + deploy Render.
+**Última actualización:** 2026-05-01 al cerrar Fase 7.
+
+### Fase 7 — Aviso privacidad LFPDPPP + ARCO (cierre)
+
+**Documentos (drafts para asesor legal):**
+- `docs/aviso_privacidad_simplificado.md` — 1 página, primer contacto comercial.
+- `docs/aviso_privacidad_integral.md` — versión web completa (10 secciones).
+- `docs/compliance_lfpdppp.md` — inventario ejecutivo: 21 columnas PII,
+  4 bases legales, 6 finalidades primarias + 2 secundarias, plan retención
+  por categoría, sanciones, 7 pendientes operativos para asesor + operador.
+
+**Módulo ARCO (`src/compliance/arco.py`):**
+- `registrar_solicitud()` — alta con folio único `ARCO-YYYYMMDD-NNN` y
+  cálculo automático de `fecha_limite_respuesta` (+20 días hábiles).
+- `listar_pendientes()` — todas las solicitudes en `recibida`/`en_proceso`
+  con días restantes calculados.
+- `listar_proximas_a_vencer(dias=3)` — alertas tempranas.
+- `marcar_vencidas()` — job diario que pasa a estatus `vencida`.
+- `responder_solicitud()` — registra respuesta y cambia a
+  `respondida`/`no_procedente`. Compliance log automático.
+- `exportar_acceso()` — para tipo='acceso', genera CSV con todos los datos
+  del titular (cumple Art. 22 LFPDPPP).
+
+**Migración `e77ccdc77b2c`:** crea tabla `arco_solicitudes` con folio único,
+4 tipos (acceso/rectificación/cancelación/oposición), 5 estatus, datos del
+solicitante, fechas de SLA, y referencia a `establecimientos` y `usuarios`.
+
+**CLI:** `--arco-pendientes` (lista pendientes + marca vencidas).
+
+**7 tests del módulo ARCO** (sin red). Total **150/150 pasan**, ruff limpio.
+
+**Pendientes operativos (no bloquean, requieren acción del operador):**
+1. Revisión legal de avisos por asesor LFPDPPP.
+2. Configurar email `datos@intergranel.mx`.
+3. Designar Responsable de Protección de Datos Personales.
+4. Capacitar a vendedores sobre captura de PII.
+5. Publicar aviso integral cuando exista sitio web operativo.
 
 ### Fase 5.4 + 5.5 — Fuentes complementarias (cierre)
 

@@ -165,6 +165,28 @@ def _cmd_asignar_agebs() -> int:
     return 0
 
 
+def _cmd_arco_pendientes() -> int:
+    setup_logging()
+    from src.compliance.arco import listar_pendientes, marcar_vencidas
+
+    with SessionLocal() as session:
+        n_vencidas = marcar_vencidas(session)
+        if n_vencidas:
+            print(f"⚠️  {n_vencidas} solicitudes pasaron a estatus 'vencida'")
+        pendientes = listar_pendientes(session)
+
+    print(f"\n=== ARCO pendientes ({len(pendientes)}) ===")
+    if not pendientes:
+        print("(ninguna)")
+        return 0
+    print(f"{'Folio':<22} {'Tipo':<14} {'Estatus':<12} {'Vence':<12} Días Solicitante")
+    for p in pendientes:
+        dias = p["dias_restantes"]
+        marca = "🔴" if dias is not None and dias <= 3 else " "
+        print(f"{p['folio']:<22} {p['tipo']:<14} {p['estatus']:<12} {p['fecha_limite']!s:<12} {marca}{dias!s:>3}  {p['solicitante'][:40]}")
+    return 0
+
+
 def _cmd_calcular_scores() -> int:
     setup_logging()
     from src.enrichment.scoring import calcular_scores_universo
@@ -292,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--aplicar-etiquetas", action="store_true", help="Cruce con CONAFAB/CANAMI/PECUARIO_GRANDE")
     parser.add_argument("--calcular-scores", action="store_true", help="Calcula score 0-100 y segmento A/B/C")
     parser.add_argument("--asignar-vendedores", action="store_true", help="Asigna vendedor por municipio")
+    parser.add_argument("--arco-pendientes", action="store_true", help="Lista solicitudes ARCO pendientes y marca vencidas")
     parser.add_argument("--cargar-agebs", help="Path a shapefile INEGI Marco Geoestadístico para cargar")
     parser.add_argument("--cve-entidad", help="Filtra carga AGEB a una entidad (ej. 22)")
     parser.add_argument("--asignar-agebs", action="store_true", help="Spatial join establecimientos ↔ agebs")
@@ -321,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_calcular_scores()
     if args.asignar_vendedores:
         return _cmd_asignar_vendedores()
+    if args.arco_pendientes:
+        return _cmd_arco_pendientes()
     if args.cargar_agebs:
         return _cmd_cargar_agebs(args.cargar_agebs, cve_entidad=args.cve_entidad)
     if args.asignar_agebs:

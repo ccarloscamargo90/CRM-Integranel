@@ -1,0 +1,126 @@
+# =====================================================================
+# Fuentes complementarias — socios de cámaras + grandes productores
+# =====================================================================
+# Datos públicos curados manualmente (Fase 5.4 / 5.5).
+#
+# Origen: presentaciones públicas, comunicados de prensa, listados DOF,
+# anuarios CONAFAB, conferencias industria avícola/porcícola/balanceado.
+#
+# Etiquetas que aplica el cruce a `establecimientos.etiquetas[]`:
+# - CONAFAB             socio del Consejo Nacional Fabricantes Alimento Balanceado
+# - PECUARIO_GRANDE     productor pecuario top (Bachoco, Pilgrim's, Norson, etc.)
+# - HARINERO_INDUSTRIAL socios CANAMI o equivalente (Maseca/Gruma, Minsa, Harimasa)
+#
+# Cruce: por razón social UPPER+TRIM exacta (similar a SAT 69-B). El cliente
+# `cruzar_fuentes_complementarias.py` actualiza `establecimientos.etiquetas[]`.
+#
+# IMPORTANTE: Esta lista es seed inicial parcial. Requiere actualización
+# manual cuando las cámaras publiquen nuevos directorios.
+# =====================================================================
+
+empresas:
+  # ---------- CONAFAB (socios fabricantes alimento balanceado) ----------
+  # Top del sector. Listas oficiales en https://conafab.org/socios (cuando responde).
+  - razon_social: BACHOCO SA DE CV
+    etiquetas: [CONAFAB, PECUARIO_GRANDE]
+    tipo: avicultura_industrial
+    notas: Productor #1 de pollo en MX. Fabricante propio de alimento balanceado.
+
+  - razon_social: AGRIBRANDS PURINA MEXICO S DE RL DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+    notas: Filial Cargill. Marca Purina.
+
+  - razon_social: MALTA TEXO DE MEXICO SA DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+
+  - razon_social: ALIMENTOS BALANCEADOS PENJAMO SA DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+    notas: Marca ALBAPESA.
+
+  - razon_social: CAMPI ALIMENTOS SA DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+
+  - razon_social: VIMIFOS SA DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+
+  - razon_social: GRUPO PORCICOLA MEXICANO SA DE CV
+    etiquetas: [CONAFAB, PECUARIO_GRANDE]
+    tipo: porcicultura_industrial
+    notas: Productor #1 de cerdo en MX (Granjas Carroll, Norson — verificar consolidación).
+
+  - razon_social: PROTEINAS ENERGETICOS Y OLEOS SA DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+
+  - razon_social: ADITIVOS Y PREMEZCLAS ESPECIALES SA DE CV
+    etiquetas: [CONAFAB]
+    tipo: alimentos_balanceados
+
+  # ---------- PECUARIO_GRANDE (no necesariamente CONAFAB) ----------
+  - razon_social: PILGRIMS PRIDE SA DE CV
+    etiquetas: [PECUARIO_GRANDE]
+    tipo: avicultura_industrial
+    notas: Subsidiaria mexicana de Pilgrim's Pride USA (JBS).
+
+  - razon_social: TYSON DE MEXICO SA DE CV
+    etiquetas: [PECUARIO_GRANDE]
+    tipo: avicultura_industrial
+
+  - razon_social: NORSON CO SA DE CV
+    etiquetas: [PECUARIO_GRANDE]
+    tipo: porcicultura_industrial
+
+  - razon_social: GRANJAS CARROLL DE MEXICO S DE RL DE CV
+    etiquetas: [PECUARIO_GRANDE]
+    tipo: porcicultura_industrial
+
+  - razon_social: KEKEN SA DE CV
+    etiquetas: [PECUARIO_GRANDE]
+    tipo: porcicultura_industrial
+    notas: Marca KEKEN (yucateco).
+
+  - razon_social: SUKARNE SA DE CV
+    etiquetas: [PECUARIO_GRANDE]
+    tipo: bovinos_carne
+    notas: Productor #1 carne bovina MX.
+
+  # ---------- HARINERO_INDUSTRIAL (CANAMI / equivalente) ----------
+  - razon_social: GRUMA SAB DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: harinera_maiz
+    notas: Marca Maseca. Líder mundial harina maíz.
+
+  - razon_social: MOLINERA DE MEXICO SA DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: harinera_maiz
+
+  - razon_social: HARIMASA SA DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: harinera_maiz
+
+  - razon_social: MINSA SA DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: harinera_maiz
+    notas: Marca Minsa.
+
+  - razon_social: GRUPO INDUSTRIAL CACEP SA DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: chocolatero
+    notas: Cacep (chocolatería peninsular).
+
+  # ---------- ALIMENTOS PLIEGO (cliente identificado en F4) ----------
+  - razon_social: ALIMENTOS PLIEGO SA DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: harinera_maiz
+    notas: Marca ALPLI. 40 sucursales detectadas en Puebla.
+
+  # ---------- INDUSTRIAS DEL MAIZ PUEBLA (cadena más grande F4) ----------
+  - razon_social: INDUSTRIAS DEL MAIZ PUEBLA SA DE CV
+    etiquetas: [HARINERO_INDUSTRIAL]
+    tipo: harinera_maiz
+    notas: 185 sucursales en 2 estados. Cadena tortilleras Puebla.

@@ -8,9 +8,68 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, **5.2 (INEGI Indicadores)**, **5.3 (Marco Geoestadístico)**, todas 2026-04-30 / 2026-05-01.
-**Próxima:** Fase 5.4 — CONAFAB/CANAMI (alimento balanceado, maíz industrializado) y/o Fase 6 (scoring).
-**Última actualización:** 2026-05-01 al cerrar Fase 5.2 y 5.3.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, **5.4+5.5 (fuentes complementarias)**, **6 (scoring)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** Fase 7 (Aviso privacidad LFPDPPP + ARCO) y Fase 8 (API + Dashboard + Deploy).
+**Última actualización:** 2026-05-01 al cerrar Fases 5.4, 5.5 y 6.
+
+### Fase 5.4 + 5.5 — Fuentes complementarias (cierre)
+
+CONAFAB sí responde (https://conafab.org), CANAMI no existe (dominio inactivo),
+SENASICA SSL roto. **Decisión:** unificar en seed YAML curado con socios
+conocidos públicamente.
+
+- `data/seeds/fuentes_complementarias.yaml` — 22 razones sociales con
+  etiquetas: CONAFAB (alimento balanceado), PECUARIO_GRANDE (Bachoco,
+  Pilgrim's, Norson, Granjas Carroll, Keken, Sukarne), HARINERO_INDUSTRIAL
+  (Gruma/Maseca, Minsa, Harimasa, Molinera de México, Alimentos Pliego,
+  Industrias del Maíz Puebla).
+- `src/ingestion/fuentes_complementarias.py` — `aplicar_etiquetas()` cruza
+  por razón social UPPER+TRIM y agrega tags al array `etiquetas[]` con
+  `array_unique`.
+- Migración `9602d1aaf900` — añade `establecimientos.etiquetas TEXT[]`
+  con índice GIN.
+- CLI: `--aplicar-etiquetas`. Compliance log automático.
+
+**Resultado real:** 292 establecimientos etiquetados (242 HARINERO_INDUSTRIAL,
+49 CONAFAB, 15 PECUARIO_GRANDE).
+
+### Fase 6 — Scoring + asignación (cierre)
+
+- `src/enrichment/scoring.py` — algoritmo con dispatch por canal:
+  - **Tortillerías** (suma 100): tamaño 20, antigüedad 10, vol Google 25,
+    pobreza inversa 10, contacto 10, consumo per cápita 10, cadena 15.
+  - **AlimentoBalanceado**: tamaño 35, antigüedad 10, vol Google 5,
+    contacto 15, cadena 10, producción maíz 25.
+  - **ForrajerasPecuario**: tamaño 25, antigüedad 10, vol Google 15,
+    contacto 15, producción maíz 15, cadena 10, pobreza inv 10.
+  - **AsociacionesAgropecuarias**: tamaño 15, antigüedad 5, vol Google 5,
+    contacto 15, producción maíz 25, cadena 5, pobreza inv 5,
+    presencia estatal 25.
+- **Bonificaciones por etiqueta** (suman al base): CONAFAB +15,
+  PECUARIO_GRANDE +10, HARINERO_INDUSTRIAL +10.
+- **Riesgo 69-B** descalifica → segmento_abc = 'X'.
+- **Segmento ABC** por percentil global: top 20% A, 20-60% B, resto C.
+- `asignar_vendedores_por_municipio()` — UPDATE basado en
+  `vendedores.municipios_ids` JSONB. No sobrescribe asignaciones manuales.
+- CLI: `--calcular-scores` (10 segundos para 136K), `--asignar-vendedores`.
+- 12 tests del scoring (sin DB). **Total 143/143 pasan.**
+
+**Resultado real (2026-05-01):**
+- 136,012 establecimientos scoreados, 0 descartados (sin riesgo 69-B).
+- Distribución: A=27,951 / B=55,400 / C=52,661.
+- Top global todos AlimentoBalanceado con CONAFAB:
+  AGRIBRANDS PURINA 100/100, MALTA TEXO 100/100, ALBAPESA 100/100,
+  PROTEINAS ENERGETICOS Y OLEOS 100/100, GRUPO PORCICOLA 96/100, BACHOCO.
+- Top tortillerías: Industrias del Maíz Puebla (80), Chocolate Mayordomo
+  Oaxaca (76), Chilim Balam (74), Molinera de México (74).
+- Por canal: AlimentoBalanceado 442/442 en A; Asociaciones 2,399 en A
+  (todas son cámaras valiosas); ForrajerasPecuario 11,820 A;
+  Tortillerías 13,290 A + 54,870 B + 52,661 C.
+
+**Limitación conocida:** segmento ABC por percentil global hace que canales
+chicos (AlimentoBalanceado, Asociaciones) caigan casi todos en A. Para Fase
+6.1 (calibración) se puede cambiar a percentil POR CANAL si el equipo de
+ventas lo solicita en el workshop.
 
 ### Fase 5.2 — INEGI Indicadores (cierre)
 

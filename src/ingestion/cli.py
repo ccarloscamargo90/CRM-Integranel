@@ -165,6 +165,49 @@ def _cmd_asignar_agebs() -> int:
     return 0
 
 
+def _cmd_calcular_scores() -> int:
+    setup_logging()
+    from src.enrichment.scoring import calcular_scores_universo
+
+    with SessionLocal() as session:
+        m = calcular_scores_universo(session)
+    print("\n=== Scores calculados ===")
+    print(f"Establecimientos actualizados: {m['actualizados']:,}")
+    print(f"Descartados (riesgo/sin canal): {m['descartados_x']:,}")
+    print("Distribución ABC:")
+    for seg in ("A", "B", "C", "X"):
+        print(f"  Segmento {seg}: {m['distribucion_abc'].get(seg, 0):,}")
+    print(f"Umbrales: p20={m['umbral_p20']}  p60={m['umbral_p60']}")
+    return 0
+
+
+def _cmd_asignar_vendedores() -> int:
+    setup_logging()
+    from src.enrichment.scoring import asignar_vendedores_por_municipio
+
+    with SessionLocal() as session:
+        m = asignar_vendedores_por_municipio(session)
+    print("\n=== Asignación a vendedores ===")
+    print(f"Establecimientos con vendedor: {m['establecimientos_con_vendedor']:,} / {m['total_establecimientos']:,}")
+    print(f"Asignados esta corrida:        {m['asignados_esta_corrida']:,}")
+    return 0
+
+
+def _cmd_aplicar_etiquetas() -> int:
+    setup_logging()
+    from src.ingestion.fuentes_complementarias import aplicar_etiquetas
+
+    with SessionLocal() as session:
+        m = aplicar_etiquetas(session)
+    print("\n=== Etiquetas complementarias aplicadas ===")
+    print(f"Empresas en seed:           {m['empresas_seed']:,}")
+    print(f"Establecimientos etiquetados: {m['establecimientos_etiquetados']:,}")
+    print("Por etiqueta:")
+    for et, n in sorted(m["por_etiqueta"].items(), key=lambda x: -x[1]):
+        print(f"  {et:<25} {n:>4}")
+    return 0
+
+
 def _cmd_cargar_indicadores() -> int:
     setup_logging()
     from src.ingestion.inegi_indicadores import cargar_desde_seed
@@ -246,6 +289,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--descargar-69b", action="store_true", help="Descarga Lista 69-B SAT y persiste en DB")
     parser.add_argument("--cruzar-69b", action="store_true", help="Cruce establecimientos.rfc vs lista 69-B SAT")
     parser.add_argument("--cargar-indicadores", action="store_true", help="Carga indicadores geográficos desde seed YAML")
+    parser.add_argument("--aplicar-etiquetas", action="store_true", help="Cruce con CONAFAB/CANAMI/PECUARIO_GRANDE")
+    parser.add_argument("--calcular-scores", action="store_true", help="Calcula score 0-100 y segmento A/B/C")
+    parser.add_argument("--asignar-vendedores", action="store_true", help="Asigna vendedor por municipio")
     parser.add_argument("--cargar-agebs", help="Path a shapefile INEGI Marco Geoestadístico para cargar")
     parser.add_argument("--cve-entidad", help="Filtra carga AGEB a una entidad (ej. 22)")
     parser.add_argument("--asignar-agebs", action="store_true", help="Spatial join establecimientos ↔ agebs")
@@ -269,6 +315,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_cruzar_69b()
     if args.cargar_indicadores:
         return _cmd_cargar_indicadores()
+    if args.aplicar_etiquetas:
+        return _cmd_aplicar_etiquetas()
+    if args.calcular_scores:
+        return _cmd_calcular_scores()
+    if args.asignar_vendedores:
+        return _cmd_asignar_vendedores()
     if args.cargar_agebs:
         return _cmd_cargar_agebs(args.cargar_agebs, cve_entidad=args.cve_entidad)
     if args.asignar_agebs:

@@ -49,7 +49,11 @@ def check_clee_duplicates(session: Session, *, max_ejemplos: int = 10) -> Hallaz
 
 
 def check_hash_duplicates(session: Session, *, max_ejemplos: int = 10) -> Hallazgo:
-    """hash_dedup también debe ser único; si no, hay colisión real o bug en hash."""
+    """hash_dedup colisiones — esperadas para nombres genéricos sin coords.
+
+    Tras la migración drop_unique_hash_dedup, este es un warning (no error).
+    Sirve para detectar candidatos a fusión entre fuentes (DENUE+Google+Manual).
+    """
     stmt = text("""
         SELECT hash_dedup, COUNT(*) AS n
         FROM establecimientos
@@ -65,10 +69,10 @@ def check_hash_duplicates(session: Session, *, max_ejemplos: int = 10) -> Hallaz
 
     return Hallazgo(
         chequeo="duplicates.hash_dedup",
-        severidad="error",
+        severidad="warning",
         total_evaluados=total_evaluados,
         total_problemas=len(duplicados),
-        detalle="hash_dedup debe ser único; colisión real o bug en sha1(nombre+cp+lat+lon)",
+        detalle="Colisiones esperadas para nombres genéricos sin coords; candidatos a fusión",
         ejemplos=[{"hash": r[0], "ocurrencias": r[1]} for r in duplicados],
     )
 

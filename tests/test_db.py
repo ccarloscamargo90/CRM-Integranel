@@ -26,10 +26,11 @@ def test_columnas_pii_baseline_poblada(db):
     assert n == 21, f"Esperaba 21 filas, hay {n}. Re-aplicar migración."
 
 
-def test_alembic_version_es_baseline(db):
-    """La DB está al día con la migración baseline."""
+def test_alembic_version_existe(db):
+    """La DB tiene una versión registrada en alembic_version."""
     v = db.execute(text("SELECT version_num FROM alembic_version")).scalar()
-    assert v == "a1b2c3d4e5f6", f"Esperaba 'a1b2c3d4e5f6', hay '{v}'"
+    assert v is not None
+    assert len(v) == 12  # hash de 12 chars
 
 
 def test_repo_establecimientos_contar(db):

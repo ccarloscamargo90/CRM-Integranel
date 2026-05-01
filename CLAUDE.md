@@ -8,9 +8,44 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0 (arqueología + scaffold), 1 (reconciliación), 1.bis (cimientos + Google Cloud), 2 (chequeos de calidad), todas 2026-04-30.
-**Próxima:** Fase 3 — descarga real DENUE (camino crítico, ~5 días). **Sin bloqueos.**
-**Última actualización:** 2026-04-30 al cerrar Fase 2.
+**Fases cerradas:** 0, 1, 1.bis, 2, **3 (ingesta DENUE)**, todas 2026-04-30.
+**Próxima:** Fase 4 — enriquecimiento Google Places (~$25 USD presupuesto D3.B).
+**Última actualización:** 2026-04-30 al cerrar Fase 3.
+
+### Capa de ingesta DENUE lista (Fase 3)
+
+**Estrategia primaria: ZIPs CSV oficiales** (descubierto durante implementación —
+los endpoints API JSON `BuscarEntidad/SCIAN/...` están obsoletos). Cada entidad
+es 1 request a `https://www.inegi.org.mx/contenidos/masiva/denue/denue_<cve>_csv.zip`,
+~3-50 MB, decodificación LATIN1, filtrado por SCIAN objetivo, upsert idempotente.
+
+- `src/core/heuristicas.py` — normaliza_nombre, hash_dedup, estrato→empleados,
+  tipo_establecimiento_de_scian (heurísticas refinadas: "molino", "moderna",
+  "union ganadera", "camara"), volumen_estimado_ton_mes, scian_desde_clee.
+- `src/core/constantes.py` — taxonomías (8 SCIAN, 4 canales, 13 entidades, bbox MX).
+- `src/ingestion/denue.py` — `descargar_zip_entidad`, `iter_csv_entidad` con
+  filter SCIAN, throttling 60 req/min, retries con tenacity. También endpoints
+  API JSON complementarios: `cuantificar`, `por_nombre`, `ficha`.
+- `src/ingestion/denue_csv_parser.py` — fila CSV → dict de Establecimiento.
+- `src/ingestion/denue_pipeline.py` — `descargar_entidad` orquesta filtro +
+  upsert por lotes de 1,000 + `actualizar_geom` (PostGIS ST_MakePoint) +
+  log en `denue_descargas_log` + compliance_log automático.
+- `src/ingestion/cli.py` — `python -m src.ingestion.cli` con `--full`, `--smoke`,
+  `--entidad`, `--scian`, `--cuantificar`, `--max-total`.
+- Migración `04a9b1e3356b` — DROP UNIQUE de hash_dedup (mantiene índice).
+  Razón: nombres genéricos sin coords colisionan; CLEE es la unicidad oficial.
+- 16 tests nuevos (CSV parser, ZIP/CSV con MockTransport, pipeline upsert).
+
+**Validación con data real:**
+- Quintana Roo descargado en 7 s: **1,098 establecimientos** en 8 SCIAN objetivo.
+- Distribución: 311830 (793), 461160 (137), 434225 (66), 434112 (50), 813110 (49),
+  311212 (2), 311110 (1).
+- 100% con geom asignado.
+- Idempotencia validada: re-correr → 0 ins / 1,098 upd.
+- Audit run: aprobado (1 warning de hash_dedup colisión esperada, 2 warnings
+  de contacto incompleto). Sin errors.
+
+**110 tests totales pasan, ruff limpio.**
 
 ### Capa de auditoría lista (Fase 2)
 

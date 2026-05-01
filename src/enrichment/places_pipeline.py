@@ -55,7 +55,7 @@ def seleccionar_candidatos_d3b(
     session: Session,
     *,
     max_tortillerias: int = 0,
-    max_cadenas: int = 200,
+    max_cadenas: int = 300,
     solo_priorizados: bool = True,
 ) -> list[Establecimiento]:
     """Selección D3.B priorizada: ~3,000 establecimientos para ~$15 USD.
@@ -100,13 +100,13 @@ def seleccionar_candidatos_d3b(
     _add(list(rows))
     logger.info("Candidatos Asociaciones: {n}", n=len(rows))
 
-    # 3. Sucursales de las top `max_cadenas` cadenas CORPORATIVAS (razón social compartida).
-    # Excluye cadenas heurísticas (nombres genéricos coincidentes que no son misma empresa).
+    # 3. Sucursales de cadenas confiables: corporativas (razón social) + locales
+    # (mismo nombre+municipio). Excluye 'heuristica' (marca residual ruidosa).
     from src.core.models import Cadena
 
     top_cadenas_ids = session.execute(
         select(Cadena.id)
-        .where(Cadena.tipo == "cadena_corporativa")
+        .where(Cadena.tipo.in_(["cadena_corporativa", "cadena_local"]))
         .order_by(Cadena.sucursales_count.desc())
         .limit(max_cadenas)
     ).scalars().all()
@@ -117,7 +117,7 @@ def seleccionar_candidatos_d3b(
         ).scalars().all()
         _add(list(rows))
         logger.info(
-            "Candidatos top {tc} cadenas corporativas: {n} sucursales",
+            "Candidatos top {tc} cadenas (corporativas+locales): {n} sucursales",
             tc=max_cadenas, n=len(rows),
         )
 

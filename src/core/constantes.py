@@ -101,19 +101,25 @@ def canal_de_scian(scian: str) -> Canal | None:
 
 
 # =============================================================================
-# Entidades priorizadas (13 estados centro-sureste)
+# Entidades priorizadas (16 estados — centro-sureste + Bajío)
 # =============================================================================
 
 # Cve INEGI → nombre. Ver CLAUDE.md §5 para densidad por canal.
+# Ampliado 2026-04-30: se agregan 01 (Aguascalientes), 11 (Guanajuato),
+# 22 (Querétaro) por solicitud del operador (incluyen cadenas relevantes
+# como La Oriental en QRO, ALPLI en GTO, etc.).
 ENTIDADES_PRIORIZADAS: dict[str, str] = {
+    "01": "Aguascalientes",
     "04": "Campeche",
     "07": "Chiapas",
     "09": "Ciudad de México",
+    "11": "Guanajuato",
     "13": "Hidalgo",
     "15": "Estado de México",
     "17": "Morelos",
     "20": "Oaxaca",
     "21": "Puebla",
+    "22": "Querétaro",
     "23": "Quintana Roo",
     "27": "Tabasco",
     "29": "Tlaxcala",

@@ -109,10 +109,17 @@ def detectar_cadenas(
     umbral: int = _UMBRAL_SUCURSALES,
     incluir_marca_residual: bool = False,
 ) -> dict:
-    """Detecta cadenas con dos estrategias.
+    """Detecta cadenas con tres estrategias en orden de confianza.
 
-    1. Por **razón social compartida** (alta confianza). Default ON.
-    2. Por **marca residual del nombre** (baja confianza, opcional).
+    1. **Razón social compartida** (alta confianza). Default ON.
+       Solo ~4% del DENUE tiene razón social pero capta los corporativos.
+    2. **Mismo nombre + mismo municipio** (confianza media). Default ON.
+       Captura cadenas locales tipo 'Tortillería La Oriental' (22 sucursales
+       todas en QRO mun 014). Como exige el mismo municipio, evita la
+       confusión de 'La Lupita' apareciendo en 13 estados (eso sería 13
+       grupos distintos, uno por estado/municipio).
+    3. **Marca residual del nombre** (baja confianza, opt-in). Default OFF.
+       Heurística ruidosa, útil para descubrimiento amplio.
 
     `umbral`: mínimo de sucursales para considerarse cadena.
     `incluir_marca_residual`: si True, agrega cadenas heurísticas (con
@@ -122,6 +129,8 @@ def detectar_cadenas(
     """
     n_cadenas_razon = 0
     n_vinculados_razon = 0
+    n_cadenas_local = 0
+    n_vinculados_local = 0
     n_cadenas_marca = 0
     n_vinculados_marca = 0
     metricas_por_scian: dict[str, dict[str, int]] = {}
@@ -191,7 +200,7 @@ def detectar_cadenas(
         n_vinculados_razon += len(ests)
 
         # Métricas por SCIAN dominante
-        metricas_por_scian.setdefault(scian_dominante, {"corporativas": 0, "heuristicas": 0})
+        metricas_por_scian.setdefault(scian_dominante, {"corporativas": 0, "locales": 0, "heuristicas": 0})
         metricas_por_scian[scian_dominante]["corporativas"] += 1
 
     logger.info(
@@ -199,7 +208,85 @@ def detectar_cadenas(
         c=n_cadenas_razon, v=n_vinculados_razon,
     )
 
-    # ---------- Estrategia 2 (opcional): marca residual ----------
+    # ---------- Estrategia 2: mismo nombre + mismo municipio ----------
+    # Solo procesa establecimientos NO vinculados aún (cadena_id IS NULL).
+    rows = session.execute(
+        select(
+            Establecimiento.id,
+            Establecimiento.nombre,
+            Establecimiento.nombre_norm,
+            Establecimiento.estado_codigo,
+            Establecimiento.municipio_codigo,
+            Establecimiento.scian_codigo,
+        ).where(
+            Establecimiento.scian_codigo.in_(SCIAN_PRIMARIOS),
+            Establecimiento.cadena_id.is_(None),
+            Establecimiento.estado_codigo.is_not(None),
+            Establecimiento.municipio_codigo.is_not(None),
+            Establecimiento.nombre_norm != "",
+        )
+    ).all()
+
+    grupos_local: dict[tuple[str, str, str], list[tuple[int, str, str]]] = defaultdict(list)
+    for r in rows:
+        # Solo agrupamos si el nombre tiene una "marca" identificable (no descriptivo)
+        marca = _clave_marca(r.nombre_norm or "")
+        if not marca:
+            continue
+        clave = (r.estado_codigo, r.municipio_codigo, marca)
+        grupos_local[clave].append((r.id, r.nombre, r.scian_codigo))
+
+    for (cve_ent, cve_mun, marca), ests in grupos_local.items():
+        if len(ests) < umbral:
+            continue
+        from collections import Counter
+
+        scian_dominante = Counter(e[2] for e in ests).most_common(1)[0][0]
+        canal = canal_de_scian(scian_dominante)
+        # nombre_grupo_norm único: "{cve_ent}{cve_mun}_{marca}" para evitar choques
+        clave_global = f"{cve_ent}{cve_mun}_{marca}"
+        nombre_legible = ests[0][1].strip().title()[:200]
+
+        existente = session.execute(
+            select(Cadena).where(Cadena.nombre_grupo_norm == clave_global)
+        ).scalar_one_or_none()
+        if existente:
+            cadena = existente
+        else:
+            cadena = Cadena(
+                nombre_grupo=nombre_legible,
+                nombre_grupo_norm=clave_global,
+                canal_principal=canal,
+                sucursales_count=len(ests),
+                tipo="cadena_local",
+                notas=f"Detectada por nombre+municipio cve={cve_ent}{cve_mun}",
+            )
+            session.add(cadena)
+            session.flush()
+            n_cadenas_local += 1
+
+        ids = [e[0] for e in ests]
+        session.execute(
+            text(
+                "UPDATE establecimientos SET cadena_id = :cid, grupo_marca = :gm "
+                "WHERE id = ANY(:ids) AND cadena_id IS NULL"
+            ),
+            {"cid": cadena.id, "gm": marca, "ids": ids},
+        )
+        cadena.sucursales_count = len(ests)
+        n_vinculados_local += len(ests)
+
+        metricas_por_scian.setdefault(
+            scian_dominante, {"corporativas": 0, "locales": 0, "heuristicas": 0}
+        )
+        metricas_por_scian[scian_dominante]["locales"] += 1
+
+    logger.info(
+        "Estrategia local (mismo mun+nombre): {c} cadenas, {v} sucursales",
+        c=n_cadenas_local, v=n_vinculados_local,
+    )
+
+    # ---------- Estrategia 3 (opcional): marca residual ----------
     if incluir_marca_residual:
         for scian in sorted(SCIAN_PRIMARIOS):
             rows = session.execute(
@@ -252,7 +339,7 @@ def detectar_cadenas(
                 cadena.sucursales_count = len(ests)
                 n_vinculados_marca += len(ests)
 
-                metricas_por_scian.setdefault(scian, {"corporativas": 0, "heuristicas": 0})
+                metricas_por_scian.setdefault(scian, {"corporativas": 0, "locales": 0, "heuristicas": 0})
                 metricas_por_scian[scian]["heuristicas"] += 1
 
         logger.info(
@@ -263,6 +350,8 @@ def detectar_cadenas(
     return {
         "cadenas_corporativas": n_cadenas_razon,
         "sucursales_corporativas": n_vinculados_razon,
+        "cadenas_locales": n_cadenas_local,
+        "sucursales_locales": n_vinculados_local,
         "cadenas_heuristicas": n_cadenas_marca,
         "sucursales_heuristicas": n_vinculados_marca,
         "por_scian": metricas_por_scian,

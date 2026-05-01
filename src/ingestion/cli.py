@@ -103,6 +103,8 @@ def _cmd_detectar_cadenas(*, incluir_marca: bool = False) -> int:
         print("\n=== Resumen ===")
         print(f"Cadenas corporativas (por razón social):  {metricas['cadenas_corporativas']:,}")
         print(f"  Sucursales vinculadas:                  {metricas['sucursales_corporativas']:,}")
+        print(f"Cadenas locales (mismo mun+nombre):       {metricas['cadenas_locales']:,}")
+        print(f"  Sucursales vinculadas:                  {metricas['sucursales_locales']:,}")
         if incluir_marca:
             print(f"Cadenas heurísticas (por marca):          {metricas['cadenas_heuristicas']:,}")
             print(f"  Sucursales vinculadas:                  {metricas['sucursales_heuristicas']:,}")

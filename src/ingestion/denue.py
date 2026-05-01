@@ -44,7 +44,14 @@ from src.core.config import get_settings
 from src.ingestion.denue_models import CuantificarItem, EstablecimientoDenueRaw
 
 DENUE_BASE_URL = "https://www.inegi.org.mx/app/api/denue/v1/consulta"
-DENUE_BULK_ZIP_URL_TPL = "https://www.inegi.org.mx/contenidos/masiva/denue/denue_{cve}_csv.zip"
+DENUE_BULK_ZIP_URL_TPL = "https://www.inegi.org.mx/contenidos/masiva/denue/denue_{cve}{suffix}_csv.zip"
+
+# Entidades que INEGI publica en ZIPs partidos (volumen excede límite del ZIP único).
+# Si la entidad está aquí, intentamos `_1`, `_2`, ... en lugar del ZIP único.
+ENTIDADES_ZIP_PARTIDO: dict[str, tuple[str, ...]] = {
+    "15": ("_1", "_2"),  # Estado de México: ~50MB + ~30MB
+    # Otras entidades grandes pueden añadirse si lo requieren (Jalisco, NL...)
+}
 
 
 class DenueError(Exception):
@@ -167,60 +174,63 @@ class DenueClient:
 
     # ---------- Descarga masiva ZIP CSV ----------
 
-    def descargar_zip_entidad(self, cve_entidad: str) -> bytes:
-        """Descarga el ZIP CSV oficial de una entidad y devuelve los bytes crudos.
+    def _urls_candidatas(self, cve_entidad: str) -> list[str]:
+        """Devuelve la lista de URLs ZIP a probar para una entidad.
 
-        Tamaños típicos: 3-50 MB. URL pública, sin token (es bulk download).
+        Para entidades en `ENTIDADES_ZIP_PARTIDO`, devuelve sólo las partes
+        (_1, _2, ...). Para las demás, el ZIP único.
         """
-        url = DENUE_BULK_ZIP_URL_TPL.format(cve=cve_entidad)
+        partes = ENTIDADES_ZIP_PARTIDO.get(cve_entidad)
+        if partes:
+            return [
+                DENUE_BULK_ZIP_URL_TPL.format(cve=cve_entidad, suffix=s) for s in partes
+            ]
+        return [DENUE_BULK_ZIP_URL_TPL.format(cve=cve_entidad, suffix="")]
+
+    def descargar_zip(self, url: str) -> bytes:
+        """Descarga un ZIP del bulk DENUE. Levanta DenueError si no es ZIP."""
         self._throttle()
         t0 = time.monotonic()
-        # Timeout generoso — los ZIPs grandes (CDMX) pueden tomar >30s.
         resp = self._client.get(url, timeout=180.0)
         elapsed_ms = int((time.monotonic() - t0) * 1000)
 
         if resp.status_code != 200:
-            raise DenueError(f"DENUE bulk ZIP HTTP {resp.status_code} para entidad {cve_entidad}")
+            raise DenueError(f"DENUE bulk ZIP HTTP {resp.status_code} en {url}")
 
         ctype = resp.headers.get("content-type", "")
         if "zip" not in ctype.lower():
-            raise DenueError(f"DENUE bulk no devolvió ZIP — content-type: {ctype}")
+            raise DenueError(f"DENUE bulk no devolvió ZIP — content-type: {ctype} en {url}")
 
-        logger.debug(
-            "ZIP entidad {cve} descargado: {bytes} bytes en {ms} ms",
-            cve=cve_entidad,
-            bytes=len(resp.content),
-            ms=elapsed_ms,
-        )
+        logger.debug("ZIP {bytes}B en {ms}ms — {url}", bytes=len(resp.content), ms=elapsed_ms, url=url)
         return resp.content
 
     def iter_csv_entidad(
         self, cve_entidad: str, *, scian_filter: set[str] | None = None
     ) -> Iterator[dict[str, str]]:
-        """Descarga el ZIP de la entidad, descomprime, y itera filas filtradas por SCIAN.
+        """Itera filas del CSV (o CSVs si la entidad es multi-parte) filtradas por SCIAN.
 
-        El CSV viene en LATIN1 con headers oficiales del DENUE. Si `scian_filter` se
-        provee, solo emite filas con `codigo_act` en el set.
+        El CSV viene en LATIN1 con headers oficiales del DENUE.
         """
-        zip_bytes = self.descargar_zip_entidad(cve_entidad)
-
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-            csv_name = next(
-                (n for n in zf.namelist() if n.lower().endswith(".csv") and "denue_inegi" in n),
-                None,
-            )
-            if csv_name is None:
-                raise DenueError(
-                    f"ZIP de entidad {cve_entidad} no contiene CSV denue_inegi_*"
+        urls = self._urls_candidatas(cve_entidad)
+        for url in urls:
+            zip_bytes = self.descargar_zip(url)
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                csv_name = next(
+                    (n for n in zf.namelist() if n.lower().endswith(".csv") and "denue_inegi" in n),
+                    None,
                 )
-            with zf.open(csv_name) as raw:
-                # Decode LATIN1 → str. Los CSV de INEGI usan windows-1252 / latin-1.
-                text_stream = io.TextIOWrapper(raw, encoding="latin-1", newline="")
-                reader = csv.DictReader(text_stream)
-                for row in reader:
-                    if scian_filter is not None and row.get("codigo_act", "") not in scian_filter:
-                        continue
-                    yield row
+                if csv_name is None:
+                    raise DenueError(f"ZIP de {url} no contiene CSV denue_inegi_*")
+                with zf.open(csv_name) as raw:
+                    text_stream = io.TextIOWrapper(raw, encoding="latin-1", newline="")
+                    reader = csv.DictReader(text_stream)
+                    for row in reader:
+                        if (
+                            scian_filter is not None
+                            and row.get("codigo_act", "") not in scian_filter
+                        ):
+                            continue
+                        yield row
 
     # ---------- API JSON complementaria ----------
 

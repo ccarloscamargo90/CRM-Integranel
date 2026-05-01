@@ -37,13 +37,42 @@ es 1 request a `https://www.inegi.org.mx/contenidos/masiva/denue/denue_<cve>_csv
 - 16 tests nuevos (CSV parser, ZIP/CSV con MockTransport, pipeline upsert).
 
 **Validación con data real:**
-- Quintana Roo descargado en 7 s: **1,098 establecimientos** en 8 SCIAN objetivo.
-- Distribución: 311830 (793), 461160 (137), 434225 (66), 434112 (50), 813110 (49),
-  311212 (2), 311110 (1).
-- 100% con geom asignado.
-- Idempotencia validada: re-correr → 0 ins / 1,098 upd.
-- Audit run: aprobado (1 warning de hash_dedup colisión esperada, 2 warnings
-  de contacto incompleto). Sin errors.
+- Quintana Roo (smoke): 1,098 establecimientos en 7 s.
+- **Descarga completa de las 13 entidades priorizadas: 124,432 establecimientos en ~4 min.**
+- 100% con geom asignado por PostGIS.
+- 35,480 (28.5%) con teléfono — el resto son target para enriquecimiento Fase 4.
+- Idempotencia validada (re-corrida = 0 ins, N upd).
+- **Audit run_all: aprobado, 0 errors.** 4 warnings esperados (hash colisiones 0.01%,
+  sin contacto 71%, dirección sospechosa 14%, formato tel 1 caso).
+
+### Universo final por entidad
+| Entidad | Count |
+|---|---:|
+| México (15) | 33,899 |
+| Puebla (21) | 18,174 |
+| Oaxaca (20) | 16,971 |
+| CDMX (09) | 14,563 |
+| Veracruz (30) | 10,054 |
+| Chiapas (07) | 6,694 |
+| Hidalgo (13) | 6,507 |
+| Tlaxcala (29) | 5,952 |
+| Morelos (17) | 3,796 |
+| Yucatán (31) | 2,959 |
+| Tabasco (27) | 2,835 |
+| Quintana Roo (23) | 1,098 |
+| Campeche (04) | 930 |
+| **TOTAL** | **124,432** |
+
+### Universo final por canal
+| Canal | Count |
+|---|---:|
+| Tortillerias | 111,410 (89.5%) |
+| ForrajerasPecuario | 10,662 (8.6%) |
+| AsociacionesAgropecuarias | 2,043 (1.6%) |
+| AlimentoBalanceado | 317 (0.3%) |
+
+**Caveat técnico:** EdoMex (15) viene en 2 ZIPs (`_1` + `_2`). El cliente
+detecta esto via `ENTIDADES_ZIP_PARTIDO` y los itera transparentemente.
 
 **110 tests totales pasan, ruff limpio.**
 

@@ -1,0 +1,131 @@
+# =====================================================================
+# render.yaml — Blueprint de despliegue de CRM-Granos-MX
+# =====================================================================
+# Documentación: https://render.com/docs/blueprint-spec
+#
+# Despliega:
+#   - 1 web service (FastAPI + uvicorn)
+#   - 1 base de datos PostgreSQL (con extensiones postgis + pg_trgm
+#     creadas por la migración baseline de Alembic).
+#   - 1 cron job mensual de SAT 69-B (cruce de prospectos en riesgo).
+#
+# Aplicar:
+#   1. Push del repo a GitHub.
+#   2. En Render → New → Blueprint → conectar repo.
+#   3. Render detecta este archivo y propone los recursos.
+#   4. Tras crear, configurar SECRETS (ver `docs/deploy_render.md`):
+#        SECRET_KEY, JWT_SECRET_KEY, INEGI_DENUE_TOKEN,
+#        GOOGLE_PLACES_API_KEY, SEED_ADMIN_PASSWORD.
+#   5. La primera deploy corre `alembic upgrade head` que crea las
+#      extensiones y todas las tablas. Después corre el seed admin.
+# =====================================================================
+
+databases:
+  - name: crm-granos-mx-db
+    plan: starter        # 1 GB storage / shared CPU. Subir a "standard" si crece.
+    region: oregon       # us-west-2; cambia a la región más cercana a México.
+    databaseName: crm_granos_mx
+    user: crm_app
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: crm-granos-mx
+    runtime: python
+    region: oregon
+    plan: starter        # 512 MB / 0.5 CPU compartida — suficiente para fase piloto.
+    branch: main
+    rootDir: .
+    buildCommand: "pip install -e ."
+    preDeployCommand: "alembic upgrade head && python scripts/seed_admin.py"
+    startCommand: "uvicorn src.api.main:app --host 0.0.0.0 --port $PORT --workers 2"
+    autoDeploy: true     # cualquier push a `main` redeploya.
+    healthCheckPath: /health
+    envVars:
+      # ----- Conectado a la DB -----
+      - key: DATABASE_URL
+        fromDatabase:
+          name: crm-granos-mx-db
+          property: connectionString
+
+      # ----- Entorno -----
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_ECHO
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.13.7"
+
+      # ----- CORS -----
+      # Cuando exista frontend separado, agregar aquí su URL.
+      # Por ahora la app sirve HTML desde el mismo host, así que solo
+      # listamos su propia URL pública (Render la inyecta).
+      - key: CORS_ORIGINS
+        value: "https://crm-granos-mx.onrender.com"
+
+      # ----- Secrets — generados por Render al crear el servicio -----
+      # `generateValue: true` produce una cadena aleatoria de 256 bits.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_EXPIRE_MINUTES
+        value: "480"
+      - key: RECOVERY_MASTER_KEY
+        generateValue: true
+
+      # ----- Secrets — el operador los pega en el dashboard de Render -----
+      # Marcados con `sync: false` → no se sobrescriben en cada deploy.
+      - key: INEGI_DENUE_TOKEN
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: MONTHLY_BUDGET_USD
+        value: "100"
+
+      # ----- Seed admin user en primer deploy -----
+      # Credenciales iniciales — cambiarlas tras primer login.
+      - key: SEED_ADMIN_USER
+        value: admin
+      - key: SEED_ADMIN_PASSWORD
+        sync: false      # operador lo pega una vez en dashboard.
+
+      # ----- SMTP (Fase 9 — recovery por email, no aplica todavía) -----
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+  # =====================================================================
+  # Cron mensual: SAT 69-B descarga + cruce
+  # Render Cron jobs son contenedores independientes que comparten DB.
+  # =====================================================================
+  - type: cron
+    name: crm-cron-sat-69b
+    runtime: python
+    region: oregon
+    plan: starter
+    branch: main
+    rootDir: .
+    schedule: "0 9 1 * *"  # día 1 de cada mes a las 9:00 UTC (3 AM CDMX)
+    buildCommand: "pip install -e ."
+    startCommand: "python -m src.ingestion.cli --descargar-69b && python -m src.ingestion.cli --cruzar-69b"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: crm-granos-mx-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: INEGI_DENUE_TOKEN
+        sync: false

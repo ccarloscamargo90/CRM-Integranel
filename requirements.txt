@@ -36,11 +36,11 @@ geopy==2.4.1
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+bcrypt==5.0.0
 python-multipart==0.0.20
 
 # Scheduling
 apscheduler==3.11.0
 
-# Templating server-side (para reportes HTML estáticos)
+# Templating server-side (Dashboard server-rendered Jinja+HTMX)
 jinja2==3.1.5

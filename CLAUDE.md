@@ -8,9 +8,52 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, 7, 8.A, **8.B (Dashboard web)**, todas 2026-04-30 / 2026-05-01.
-**Próxima:** Fase 8.C — Deploy Render (render.yaml + Procfile).
-**Última actualización:** 2026-05-01 al cerrar Fase 8.B.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, 7, 8.A, 8.B, **8.C (Deploy Render)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** carga inicial de data en producción + onboarding del equipo de ventas.
+**Última actualización:** 2026-05-01 al cerrar Fase 8.C.
+
+### Fase 8.C — Deploy a Render (cierre)
+
+**Archivos de despliegue:**
+- `render.yaml` — Blueprint declarativo:
+  - Web service `crm-granos-mx` (starter plan, $7/mes, 2 workers uvicorn,
+    `preDeployCommand: alembic upgrade head && python scripts/seed_admin.py`).
+  - PostgreSQL `crm-granos-mx-db` (starter plan, $7/mes, 1 GB, Postgres 16).
+  - Cron job `crm-cron-sat-69b` mensual (día 1, 9:00 UTC) que corre el cruce
+    SAT 69-B automáticamente.
+  - Secrets generados por Render (`generateValue: true`): `SECRET_KEY`,
+    `JWT_SECRET_KEY`, `RECOVERY_MASTER_KEY`.
+  - Secrets manuales (`sync: false`): `INEGI_DENUE_TOKEN`,
+    `GOOGLE_PLACES_API_KEY`, `SEED_ADMIN_PASSWORD`, SMTP.
+- `Procfile` — fallback compatible con cualquier PaaS estilo Heroku.
+
+**Ajustes para producción:**
+- `src/core/config.py:_normalize_db_url` — validator Pydantic que traduce
+  `postgres://` o `postgresql://` → `postgresql+psycopg://` automáticamente.
+  Verificado con 4 formatos de URL típicos de Render.
+- `src/api/routes/auth_routes.py` — cookie ya tenía
+  `secure=settings.is_production` desde F8.A.
+- `pyproject.toml` + `requirements.txt` — `passlib[bcrypt]` reemplazado por
+  `bcrypt==5.0.0` directo (passlib no soporta bcrypt 5.x).
+
+**Documentación:**
+- `docs/deploy_render.md` — guía paso a paso de 12 secciones:
+  pre-requisitos, push GitHub, blueprint sync, secrets, primer deploy, smoke,
+  carga inicial de data en prod, cron jobs, backups, vars dev→prod,
+  troubleshooting (postgis, DATABASE_URL, build lento, alembic conflicts),
+  pendientes operativos LFPDPPP.
+
+**Costo mensual estimado:** ~$14 USD (Web $7 + Postgres $7).
+
+**Total 189/189 tests pasan, ruff limpio, 21 rutas montadas en la app.**
+
+**Pendiente fuera del scope técnico:**
+1. Operador push del repo a GitHub.
+2. Operador conecta Render → New Blueprint.
+3. Operador pega los 3 secrets manuales en el dashboard.
+4. Tras primer deploy, el operador entra a Render Shell y corre los pipelines
+   de ingesta uno a uno (DENUE, SAT 69-B, indicadores, cadenas, Places,
+   etiquetas, scoring, asignación de vendedores).
 
 ### Fase 8.B — Dashboard server-rendered (cierre)
 

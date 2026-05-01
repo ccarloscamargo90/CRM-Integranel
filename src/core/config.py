@@ -13,7 +13,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production"]
@@ -40,6 +40,22 @@ class Settings(BaseSettings):
         ..., description="URL completa de Postgres con driver psycopg"
     )
     DATABASE_ECHO: bool = False
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        """Render entrega `postgres://` o `postgresql://`. Forzamos driver psycopg.
+
+        Esto permite usar el `DATABASE_URL` que Render inyecta sin tener que
+        post-procesarlo en el shell antes de arrancar uvicorn.
+        """
+        if not v:
+            return v
+        if v.startswith("postgres://"):
+            v = "postgresql://" + v[len("postgres://"):]
+        if v.startswith("postgresql://") and "+psycopg" not in v:
+            v = "postgresql+psycopg://" + v[len("postgresql://"):]
+        return v
 
     # ---------- INEGI / DENUE ----------
     INEGI_DENUE_TOKEN: str = Field(..., description="Token gratuito de INEGI DENUE API")

@@ -42,11 +42,15 @@ class ResumenEnriquecimiento:
 
 
 def _ya_enriquecido(session: Session, est_id: int) -> bool:
-    """True si ya hay un row de enriquecimiento_google con match para este est."""
-    stmt = (
-        select(EnriquecimientoGoogle)
-        .where(EnriquecimientoGoogle.establecimiento_id == est_id)
-        .where(EnriquecimientoGoogle.match_status == "match")
+    """True si ya hay un row de enriquecimiento_google (cualquier match_status).
+
+    Skipea tanto matches (no re-pagar por place_details que ya tenemos) como
+    no_matches (no re-intentar contra Google si ya determinamos que no hay
+    coincidencia razonable). Para forzar re-intento, borrar la fila de
+    enriquecimiento_google manualmente.
+    """
+    stmt = select(EnriquecimientoGoogle).where(
+        EnriquecimientoGoogle.establecimiento_id == est_id
     )
     return session.execute(stmt).scalar_one_or_none() is not None
 
@@ -84,24 +88,9 @@ def seleccionar_candidatos_d3b(
 
         base_filter.append(Establecimiento.estado_codigo.in_(CVE_ENTIDADES_PRIORIZADAS))
 
-    # 1. AlimentoBalanceado
-    rows = session.execute(
-        select(Establecimiento)
-        .where(Establecimiento.canales.any("AlimentoBalanceado"), *base_filter)
-    ).scalars().all()
-    _add(list(rows))
-    logger.info("Candidatos AlimentoBalanceado: {n}", n=len(rows))
-
-    # 2. AsociacionesAgropecuarias
-    rows = session.execute(
-        select(Establecimiento)
-        .where(Establecimiento.canales.any("AsociacionesAgropecuarias"), *base_filter)
-    ).scalars().all()
-    _add(list(rows))
-    logger.info("Candidatos Asociaciones: {n}", n=len(rows))
-
-    # 3. Sucursales de cadenas confiables: corporativas (razón social) + locales
-    # (mismo nombre+municipio). Excluye 'heuristica' (marca residual ruidosa).
+    # 1. CADENAS PRIMERO (corporativas + locales). Si el job se interrumpe,
+    # al menos las cadenas (que son los clientes corporativos de mayor valor)
+    # quedan procesadas.
     from src.core.models import Cadena
 
     top_cadenas_ids = session.execute(
@@ -120,6 +109,22 @@ def seleccionar_candidatos_d3b(
             "Candidatos top {tc} cadenas (corporativas+locales): {n} sucursales",
             tc=max_cadenas, n=len(rows),
         )
+
+    # 2. AlimentoBalanceado (clientes industriales — Bachoco, Purina, etc.)
+    rows = session.execute(
+        select(Establecimiento)
+        .where(Establecimiento.canales.any("AlimentoBalanceado"), *base_filter)
+    ).scalars().all()
+    _add(list(rows))
+    logger.info("Candidatos AlimentoBalanceado: {n}", n=len(rows))
+
+    # 3. AsociacionesAgropecuarias (volumen alto pero match rate bajo)
+    rows = session.execute(
+        select(Establecimiento)
+        .where(Establecimiento.canales.any("AsociacionesAgropecuarias"), *base_filter)
+    ).scalars().all()
+    _add(list(rows))
+    logger.info("Candidatos Asociaciones: {n}", n=len(rows))
 
     # 4. Top tortillerías por volumen
     rows = session.execute(
@@ -176,12 +181,18 @@ def run_enriquecimiento(
             except BudgetExceededError as e:
                 logger.warning("Budget exceeded — paro enriquecimiento: {e}", e=e)
                 res.primer_error = str(e)
+                session.rollback()
                 break
             except Exception as e:
                 res.errores += 1
                 if not res.primer_error:
                     res.primer_error = f"{type(e).__name__}: {e}"
                 logger.warning("Error enriqueciendo {id}: {e}", id=est.id, e=e)
+                # Rollback para evitar PendingRollbackError en siguientes flushes
+                try:
+                    session.rollback()
+                except Exception:
+                    pass
 
             if i % commit_cada == 0:
                 session.commit()

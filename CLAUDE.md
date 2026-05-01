@@ -40,18 +40,32 @@
   Tasa de match baja porque AlimentoBalanceado son plantas B2B sin perfil
   consumer en Google Places (esperado).
 
-**Costos reales del universo D3.B completo (default `max_cadenas=20`):**
-- 6,624 candidatos identificados
-- $33 USD mínimo (todos no_match) — $152 USD máximo (todos match con Pro)
-- ~$92 USD si tasa match 50%
-- **El estimado original de $25 USD asumía 5K candidatos; refinar D3.B**
-  bajando `max_cadenas` o usando subset por canal mantiene el budget.
+**Resultado real de la corrida completa (2026-04-30, 16 entidades):**
+- **2,022 matches** (29.7% rate) sobre 6,810 candidatos D3.B
+- **$73.40 USD** gastados de $100 budget (3 corridas iteradas)
+- 0 errores tras refactor a UPSERT atómico
 
-**Recomendaciones de uso por presupuesto:**
-- **$3 USD:** solo AlimentoBalanceado (317) — `python -m src.ingestion.cli --enriquecer --max-total 317`
-- **$25 USD:** AlimentoBalanceado + Asociaciones (2,360)
-- **$50 USD:** D3.B sin cadenas (~3,000 candidatos)
-- **$100 USD (todo el budget):** D3.B completo respetando circuit breaker
+Match rate por canal (mejor primero):
+- ForrajerasPecuario: 44% (158 matches) — mejor visibilidad en Google
+- Tortillerías cadenas: 29% (1,049 matches)
+- AsociacionesAgropecuarias: 28% (696 matches)
+- AlimentoBalanceado: 27% (119 matches) — B2B, menos visible
+
+**Hallazgos durante la corrida:**
+- 3 migraciones drop UNIQUE necesarias: cadenas.nombre_grupo,
+  enriquecimiento_google.place_id, establecimientos.google_place_id.
+  Razón: 2 establecimientos DENUE pueden mapear al mismo place_id Google.
+- `_persistir_match`/`_persistir_no_match` migrados a UPSERT atómico
+  (`pg_insert.on_conflict_do_update`) por robustez ante sesiones rotas.
+- Detector de cadenas refactorizado a 3 estrategias en orden de confianza.
+- Cache `_ya_enriquecido` ahora skipea match Y no_match para no re-pagar.
+
+**Casos destacados verificados:**
+- Tortillería La Oriental QRO: 10/22 sucursales matcheadas, ratings ★4.5-★4.7,
+  2 teléfonos verificados (442 509 7363, 442 214 6199).
+- BACHOCO: matcheado con datos de planta industrial Veracruz CEDIS ★4.6.
+- AGRIBRANDS PURINA Planta Puebla: matcheado ★4.2.
+- ALIMENTOS PLIEGO (ALPLI): 15/40 sucursales con rating y sitio web.
 
 ### Capa de ingesta DENUE lista (Fase 3)
 

@@ -19,6 +19,7 @@ from typing import Any
 
 from loguru import logger
 from rapidfuzz import fuzz
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.core.heuristicas import normaliza_nombre
@@ -174,37 +175,54 @@ def enriquecer_establecimiento(
     return _persistir_match(session, est, mejor, detalle or mejor.raw)
 
 
+def _upsert_enriquecimiento(session: Session, **valores: Any) -> EnriquecimientoGoogle:
+    """UPSERT atómico en enriquecimiento_google por establecimiento_id.
+
+    Usa INSERT ON CONFLICT DO UPDATE de PostgreSQL para ser robusto contra
+    estados de sesión rotos. Devuelve el row resultante recargado.
+    """
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    stmt = pg_insert(EnriquecimientoGoogle).values(**valores)
+    set_dict = {k: getattr(stmt.excluded, k) for k in valores if k != "establecimiento_id"}
+    set_dict["fecha_enriquecimiento"] = text("NOW()")
+    upsert = stmt.on_conflict_do_update(
+        index_elements=["establecimiento_id"],
+        set_=set_dict,
+    )
+    session.execute(upsert)
+    session.flush()
+    return session.get(EnriquecimientoGoogle, valores["establecimiento_id"])
+
+
 def _persistir_match(
     session: Session,
     est: Establecimiento,
     candidato: CandidatoEvaluado,
     detalle: dict[str, Any],
 ) -> EnriquecimientoGoogle:
-    enriq = session.get(EnriquecimientoGoogle, est.id)
-    if enriq is None:
-        enriq = EnriquecimientoGoogle(establecimiento_id=est.id, place_id=candidato.place_id)
-        session.add(enriq)
-
     loc = detalle.get("location") or {}
-    enriq.place_id = candidato.place_id
-    enriq.match_score = candidato.score
-    enriq.match_status = "match"
-    enriq.google_display_name = (detalle.get("displayName") or {}).get("text")
-    enriq.google_formatted_address = detalle.get("formattedAddress")
-    enriq.google_types = detalle.get("types")
-    enriq.google_business_status = detalle.get("businessStatus")
-    enriq.google_rating = detalle.get("rating")
-    enriq.google_user_rating_count = detalle.get("userRatingCount")
-    enriq.google_opening_hours = detalle.get("regularOpeningHours")
-    enriq.google_price_level = detalle.get("priceLevel")
-    enriq.google_phone = detalle.get("nationalPhoneNumber")
-    enriq.google_website = detalle.get("websiteUri")
-    enriq.google_lat = loc.get("latitude")
-    enriq.google_lon = loc.get("longitude")
-    session.flush()
+    valores = {
+        "establecimiento_id": est.id,
+        "place_id": candidato.place_id,
+        "match_score": candidato.score,
+        "match_status": "match",
+        "google_display_name": (detalle.get("displayName") or {}).get("text"),
+        "google_formatted_address": detalle.get("formattedAddress"),
+        "google_types": detalle.get("types"),
+        "google_business_status": detalle.get("businessStatus"),
+        "google_rating": detalle.get("rating"),
+        "google_user_rating_count": detalle.get("userRatingCount"),
+        "google_opening_hours": detalle.get("regularOpeningHours"),
+        "google_price_level": detalle.get("priceLevel"),
+        "google_phone": detalle.get("nationalPhoneNumber"),
+        "google_website": detalle.get("websiteUri"),
+        "google_lat": loc.get("latitude"),
+        "google_lon": loc.get("longitude"),
+    }
+    enriq = _upsert_enriquecimiento(session, **valores)
 
-    # Actualizar campos derivados en establecimientos: place_id + fuente + telefono
-    # si DENUE no tenía. NO sobrescribir teléfono manual.
+    # Actualizar campos derivados en establecimientos. NO sobrescribir teléfono manual.
     if est.google_place_id != candidato.place_id:
         est.google_place_id = candidato.place_id
     if "Google_Places" not in (est.fuentes or []):
@@ -223,17 +241,11 @@ def _persistir_no_match(
     place_id_candidato: str | None = None,
     score: float | None = None,
 ) -> EnriquecimientoGoogle:
-    enriq = session.get(EnriquecimientoGoogle, est.id)
-    if enriq is None:
-        # Necesita un place_id distinto, usamos sufijo no-match único
-        enriq = EnriquecimientoGoogle(
-            establecimiento_id=est.id,
-            place_id=place_id_candidato or f"no_match_{est.id}",
-            match_status="no_match",
-        )
-        session.add(enriq)
-    enriq.match_score = score
-    enriq.match_status = "no_match"
-    enriq.google_display_name = motivo[:200] if motivo else None
-    session.flush()
-    return enriq
+    valores = {
+        "establecimiento_id": est.id,
+        "place_id": place_id_candidato or f"no_match_{est.id}",
+        "match_score": score,
+        "match_status": "no_match",
+        "google_display_name": motivo[:200] if motivo else None,
+    }
+    return _upsert_enriquecimiento(session, **valores)

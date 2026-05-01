@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CRM Granos MX{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eef9f4', 500:'#15803d', 600:'#166534', 700:'#14532d' },
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+{% if user %}
+<nav class="bg-primary-600 text-white shadow">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-6">
+      <a href="/" class="font-bold text-lg">CRM Granos MX</a>
+      <a href="/" class="hover:underline {% if active=='dashboard' %}underline{% endif %}">Dashboard</a>
+      <a href="/lista" class="hover:underline {% if active=='lista' %}underline{% endif %}">Prospectos</a>
+      <a href="/mapa" class="hover:underline {% if active=='mapa' %}underline{% endif %}">Mapa</a>
+    </div>
+    <div class="flex items-center gap-4 text-sm">
+      <span>{{ user.nombre }} <span class="opacity-75">({{ user.rol }})</span></span>
+      <form action="/logout" method="post" class="inline">
+        <button type="submit" class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded">Salir</button>
+      </form>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+  {% if mensaje %}
+  <div class="mb-4 px-4 py-2 rounded {% if mensaje_tipo=='ok' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+    {{ mensaje }}
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="border-t bg-white py-3 text-center text-xs text-gray-500">
+  Intergranel · CRM Granos MX · LFPDPPP 2025 · v0.1.0
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Prospectos · CRM Granos MX{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-bold">Prospectos</h1>
+  <div class="text-sm text-gray-500">
+    Mostrando <span id="showing-count">{{ items | length }}</span> de <span id="total-count">{{ total }}</span>
+    <span class="htmx-indicator ml-2">⏳</span>
+  </div>
+</div>
+
+<!-- Filtros -->
+<form id="filtros"
+      hx-get="/lista/fragment"
+      hx-trigger="change from:select, keyup changed delay:400ms from:input[type='search']"
+      hx-target="#tabla"
+      hx-swap="innerHTML"
+      hx-indicator=".htmx-indicator"
+      class="bg-white shadow rounded p-4 mb-4 grid md:grid-cols-5 gap-3 text-sm">
+  <select name="canal" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todos los canales</option>
+    {% for c in canales %}
+      <option value="{{ c }}" {% if filtros.canal == c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <select name="segmento" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todos los segmentos</option>
+    {% for s in ['A','B','C','X'] %}
+      <option value="{{ s }}" {% if filtros.segmento == s %}selected{% endif %}>Segmento {{ s }}</option>
+    {% endfor %}
+  </select>
+  <select name="estado_pipeline" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todas las etapas</option>
+    {% for e in ['no_contactado','contactado','calificado','propuesta','ganado','perdido'] %}
+      <option value="{{ e }}" {% if filtros.estado_pipeline == e %}selected{% endif %}>{{ e }}</option>
+    {% endfor %}
+  </select>
+  <select name="estado_codigo" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todas las entidades</option>
+    {% for cve, nom in entidades %}
+      <option value="{{ cve }}" {% if filtros.estado_codigo == cve %}selected{% endif %}>{{ nom }}</option>
+    {% endfor %}
+  </select>
+  <input type="search" name="q" placeholder="Buscar nombre..." value="{{ filtros.q or '' }}"
+         class="border-gray-300 rounded px-2 py-1.5">
+</form>
+
+<!-- Tabla -->
+<div class="bg-white shadow rounded overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500 sticky top-0">
+      <tr>
+        <th class="px-3 py-2">Nombre</th>
+        <th class="px-3 py-2">Canal</th>
+        <th class="px-3 py-2">Estado / Mun.</th>
+        <th class="px-3 py-2 text-right">Score</th>
+        <th class="px-3 py-2">Pipeline</th>
+        <th class="px-3 py-2">Tel.</th>
+      </tr>
+    </thead>
+    <tbody id="tabla" class="divide-y">
+      {% include "partials/lista_filas.html" %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

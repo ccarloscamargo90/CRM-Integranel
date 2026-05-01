@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Mapa · CRM Granos MX{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-3">
+  <h1 class="text-2xl font-bold">Mapa de prospectos</h1>
+  <div class="text-sm text-gray-500">
+    <span id="map-count">0</span> visibles
+    <span class="htmx-indicator ml-2">⏳</span>
+  </div>
+</div>
+
+<form id="map-filtros" class="bg-white shadow rounded p-3 mb-4 grid md:grid-cols-4 gap-3 text-sm">
+  <select name="canal" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todos los canales</option>
+    {% for c in canales %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+  </select>
+  <select name="segmento" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todos los segmentos</option>
+    {% for s in ['A','B','C','X'] %}<option value="{{ s }}">Segmento {{ s }}</option>{% endfor %}
+  </select>
+  <select name="estado_codigo" class="border-gray-300 rounded px-2 py-1.5">
+    <option value="">Todas las entidades</option>
+    {% for cve, nom in entidades %}<option value="{{ cve }}">{{ nom }}</option>{% endfor %}
+  </select>
+  <input type="number" name="limit" min="100" max="5000" step="100" value="1000"
+         class="border-gray-300 rounded px-2 py-1.5"
+         title="Máximo de marcadores a renderizar">
+</form>
+
+<div id="mapa" class="bg-white shadow rounded"></div>
+
+<p class="text-xs text-gray-500 mt-2">
+  Centro de México como vista por defecto. Solo prospectos con coordenadas válidas se muestran.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const colorPorSegmento = { 'A': '#16a34a', 'B': '#eab308', 'C': '#94a3b8', 'X': '#dc2626' };
+
+const map = L.map('mapa').setView([19.4326, -99.1332], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap',
+  maxZoom: 19,
+}).addTo(map);
+
+let cluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+map.addLayer(cluster);
+
+async function cargarMapa() {
+  const form = document.getElementById('map-filtros');
+  const params = new URLSearchParams(new FormData(form));
+  document.querySelector('.htmx-indicator').classList.add('htmx-request');
+  try {
+    const res = await fetch('/api/mapa-data?' + params.toString());
+    if (!res.ok) throw new Error('Fallo al cargar mapa');
+    const data = await res.json();
+    cluster.clearLayers();
+    const markers = data.items.map(p => {
+      const color = colorPorSegmento[p.segmento_abc] || '#6b7280';
+      const m = L.circleMarker([p.lat, p.lon], {
+        radius: 6, color, fillColor: color, fillOpacity: 0.7, weight: 1
+      });
+      m.bindPopup(`
+        <strong>${p.nombre}</strong><br>
+        ${p.canales.join(', ')}<br>
+        Score: ${p.score ?? '—'} (${p.segmento_abc ?? '—'})<br>
+        <a href="/prospecto/${p.id}">Ver detalle →</a>
+      `);
+      return m;
+    });
+    cluster.addLayers(markers);
+    document.getElementById('map-count').textContent = data.items.length;
+    if (data.items.length && !params.get('estado_codigo')) {
+      // Mantener vista nacional por defecto
+    } else if (data.items.length) {
+      const group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds(), { padding: [20, 20] });
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Error cargando el mapa');
+  } finally {
+    document.querySelector('.htmx-indicator').classList.remove('htmx-request');
+  }
+}
+
+document.getElementById('map-filtros').addEventListener('change', cargarMapa);
+cargarMapa();
+</script>
+{% endblock %}

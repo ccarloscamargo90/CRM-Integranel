@@ -8,9 +8,73 @@
 
 ## 1. Estado del proyecto
 
-**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, 7, **8.A (API REST)**, todas 2026-04-30 / 2026-05-01.
-**Próxima:** Fase 8.B — Dashboard server-rendered (Jinja+HTMX) + mapa Leaflet.
-**Última actualización:** 2026-05-01 al cerrar Fase 8.A.
+**Fases cerradas:** 0, 1, 1.bis, 2, 3, 4, 5.1, 5.2, 5.3, 5.4+5.5, 6, 7, 8.A, **8.B (Dashboard web)**, todas 2026-04-30 / 2026-05-01.
+**Próxima:** Fase 8.C — Deploy Render (render.yaml + Procfile).
+**Última actualización:** 2026-05-01 al cerrar Fase 8.B.
+
+### Fase 8.B — Dashboard server-rendered (cierre)
+
+**Stack web:**
+- **Jinja2** templates en `src/api/templates/` (Jinja2Templates de FastAPI).
+- **HTMX 1.9.12** vía CDN para swaps reactivos (filtros lista, etc.).
+- **Tailwind CSS 3.4** vía CDN (`cdn.tailwindcss.com`).
+- **Leaflet 1.9.4** + **leaflet.markercluster 1.5.3** vía unpkg para el mapa.
+- Tile provider: OpenStreetMap (free, sin API key).
+- CSS custom mínimo en `src/api/static/app.css` (mapa, score-bar, htmx-indicator).
+
+**Templates (`src/api/templates/`):**
+- `base.html` — layout con nav + footer + slots (content, scripts, mensaje).
+- `login.html` — form simple username/password.
+- `dashboard.html` — KPIs (total/A/B/riesgo), distribución canal, pipeline, top 10.
+- `lista.html` — tabla con filtros HTMX (canal, segmento, etapa, entidad, búsqueda).
+- `partials/lista_filas.html` — fragment con `<tr>` que HTMX swap-ea en `#tabla`.
+- `detalle.html` — info completa + form contacto + historial pipeline + interacciones.
+- `mapa.html` — Leaflet con clustering, color por segmento ABC, popup con link a detalle.
+
+**Rutas web (`src/api/web.py`):**
+- `GET /login`, `POST /login` (form), `POST /logout` — flujo HTML completo.
+- `GET /` — dashboard con queries agregadas (vendedor solo ve lo suyo).
+- `GET /lista` — listado paginado a 100 con filtros.
+- `GET /lista/fragment` — fragment HTMX, swap-ea solo `#tabla`.
+- `GET /prospecto/{id}` — detalle + compliance log automático.
+- `POST /prospecto/{id}/contacto` — registra Interaccion + cambia pipeline + redirect con flash.
+- `GET /mapa` — vista Leaflet.
+- `GET /api/mapa-data` — JSON `[{id,nombre,lat,lon,canales,score,segmento_abc}]`,
+  filtros canal/segmento/estado_codigo, limit clampeado [100, 5000], default 1000.
+
+**Diseño de auth para web:** dependencia `get_current_user_web()` que devuelve
+`Usuario | None` en lugar de levantar 401. Cada ruta hace su propio
+`if not user: redirect /login`. Esto evita que el navegador reciba JSON 401 que
+no sabe interpretar.
+
+**Compartido con API:** mismo cookie `crm_token` JWT, mismas funciones
+`crear_jwt`/`verify_password`. Web y API son intercambiables — puedes loguearte
+por API y consumir HTML, o viceversa.
+
+**Tests (19 nuevos en `test_api_web.py`):**
+- Login form GET/POST OK/wrong-password.
+- Dashboard sin auth redirige; con auth renderiza KPIs y top10.
+- Lista renderiza tabla; fragment HTMX devuelve solo `<tr>`; sin auth 401;
+  filtro `q` busca por nombre.
+- Detalle 200/404; POST contacto redirige con mensaje y cambia pipeline;
+  tipo inválido redirige con error.
+- Mapa renderiza HTML; `/api/mapa-data` devuelve JSON con coords correctas;
+  filtra por estado_codigo; sin auth 401.
+- Logout borra cookie y redirige.
+
+**Total 189/189 tests pasan, ruff limpio.**
+
+**Smoke browser real (Claude Preview):** login admin → dashboard con 136,012
+totales / 27,951 segmento A / distribución por canal correcta → lista filtrada
+HTMX a Tortillerías muestra Industrias del Maíz Puebla 80, Chocolate Mayordomo
+Trujano, Chilim Balam → click detalle muestra Industrias del Maíz Puebla con
+rating ★4.5 31 reseñas, tel real, sitio LATORTI.MX → registrar llamada con
+cambio de pipeline → flash "Contacto registrado" + pipeline a "contactado" +
+historial actualizado → mapa Leaflet con clustering muestra 1000 marcadores
+distribuidos correctamente; filtro Aguascalientes auto-zoom a 848 + 89 + 56 + 7.
+
+**`launch.json` raíz workspace:** entrada `crm-api` agregada para preview en
+puerto 8767.
 
 ### Fase 8.A — API REST FastAPI con auth (cierre)
 

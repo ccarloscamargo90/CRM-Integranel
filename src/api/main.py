@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
+from src.api import web
 from src.api.routes import auth_routes, prospectos
 from src.core.config import get_settings
 from src.core.logging import setup_logging
@@ -54,17 +57,11 @@ def health() -> JSONResponse:
     return JSONResponse({"status": "ok", "version": "0.1.0", "env": settings.ENVIRONMENT})
 
 
-@app.get("/", tags=["health"])
-def root() -> JSONResponse:
-    return JSONResponse(
-        {
-            "name": "CRM-Granos-MX API",
-            "docs": "/docs",
-            "health": "/health",
-        }
-    )
+# Static (CSS custom — todo lo demás vía CDN)
+_STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
-
-# Routers
+# Routers — JSON API + HTML web
 app.include_router(auth_routes.router)
 app.include_router(prospectos.router)
+app.include_router(web.router)

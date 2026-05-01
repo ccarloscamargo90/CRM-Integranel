@@ -1,0 +1,32 @@
+/* Estilos custom mínimos. Todo lo demás vía Tailwind CDN. */
+
+#mapa {
+  height: 70vh;
+  border-radius: 0.5rem;
+}
+
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-block;
+}
+
+.score-bar {
+  height: 6px;
+  background: linear-gradient(to right, #ef4444, #eab308, #22c55e);
+  border-radius: 9999px;
+  position: relative;
+}
+.score-bar::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #1f2937;
+  left: calc(var(--score, 0) * 1% - 6px);
+}

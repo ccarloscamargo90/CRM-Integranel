@@ -35,7 +35,7 @@ geopy==2.4.1
 # API REST + auth
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-python-jose[cryptography]==3.3.0
+PyJWT==2.10.1
 bcrypt==5.0.0
 python-multipart==0.0.20
 

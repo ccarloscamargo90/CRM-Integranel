@@ -15,7 +15,8 @@ import datetime as dt
 from typing import Any
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt as pyjwt
+from jwt.exceptions import PyJWTError
 
 from src.core.config import get_settings
 
@@ -46,7 +47,7 @@ def crear_jwt(*, username: str, rol: str, vendedor_id: int | None = None) -> str
         "iat": ahora,
         "exp": ahora + dt.timedelta(minutes=settings.JWT_EXPIRE_MINUTES),
     }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+    return pyjwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
 
 
 def decodificar_jwt(token: str) -> dict[str, Any] | None:
@@ -55,6 +56,6 @@ def decodificar_jwt(token: str) -> dict[str, Any] | None:
     if not settings.JWT_SECRET_KEY:
         return None
     try:
-        return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
-    except JWTError:
+        return pyjwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+    except PyJWTError:
         return None

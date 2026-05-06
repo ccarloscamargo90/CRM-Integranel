@@ -44,3 +44,4 @@ volumes:
 networks:
   erp-net:
     external: true
+    name: erp-intergranel_erp-net

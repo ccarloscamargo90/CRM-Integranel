@@ -1,0 +1,46 @@
+version: "3.9"
+
+# Extensión del docker-compose del ERP para agregar el CRM.
+# Usar con: docker compose -f docker-compose.yml -f infra/docker-compose.crm.yml up -d
+
+services:
+  crm-postgres:
+    image: postgis/postgis:16-3.4
+    container_name: crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${CRM_DB_USER:-crm}
+      POSTGRES_PASSWORD: ${CRM_DB_PASSWORD}
+      POSTGRES_DB: ${CRM_DB_NAME:-crm_granos_mx}
+    volumes:
+      - crm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CRM_DB_USER:-crm} -d ${CRM_DB_NAME:-crm_granos_mx}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - erp-net
+
+  crm-api:
+    build:
+      context: ../CRM-Integranel
+      dockerfile: Dockerfile
+    image: crm-api:latest
+    container_name: crm-api
+    restart: unless-stopped
+    env_file: .env.crm
+    ports:
+      - "8000:8000"
+    depends_on:
+      crm-postgres:
+        condition: service_healthy
+    networks:
+      - erp-net
+
+volumes:
+  crm_postgres_data:
+
+networks:
+  erp-net:
+    external: true
